@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     database_url: str = Field(default="sqlite:///./app.db", alias="DATABASE_URL")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    storage_provider: str = Field(default="local", alias="STORAGE_PROVIDER")
     frontend_origins: str = Field(
         default="http://localhost:3000,http://localhost:8080,http://localhost:5173",
         alias="FRONTEND_ORIGINS",
@@ -29,9 +30,11 @@ class Settings(BaseSettings):
     local_storage_path: str = Field(default="./storage", alias="LOCAL_STORAGE_PATH")
 
     aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
+    aws_s3_endpoint_url: str = Field(default="", alias="AWS_S3_ENDPOINT_URL")
     s3_bucket_raw: str = Field(default="", alias="S3_BUCKET_RAW")
     s3_bucket_audio: str = Field(default="", alias="S3_BUCKET_AUDIO")
     s3_bucket_artifacts: str = Field(default="", alias="S3_BUCKET_ARTIFACTS")
+    s3_presign_expiry_seconds: int = Field(default=3600, alias="S3_PRESIGN_EXPIRY_SECONDS")
 
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
     groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
@@ -46,6 +49,10 @@ class Settings(BaseSettings):
     @property
     def local_storage_dir(self) -> Path:
         return Path(self.local_storage_path).resolve()
+
+    @property
+    def use_s3_storage(self) -> bool:
+        return self.storage_provider.lower() == "s3"
 
 
 @lru_cache

@@ -10,7 +10,7 @@ from app.models.lecture_section import LectureSection
 from app.models.user import User
 from app.schemas.lecture import LectureResponse, LectureTrackResponse, VoiceUpdateRequest
 from app.services.processing_service import ProcessingService
-from app.services.storage_service import LocalStorageService
+from app.services.storage_service import get_storage_service
 
 
 router = APIRouter()
@@ -77,7 +77,7 @@ def get_lecture_tracks(
     if lecture.owner_user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
 
-    storage = LocalStorageService()
+    storage = get_storage_service()
     rows = db.execute(
         select(LectureSection, AudioTrack)
         .outerjoin(AudioTrack, AudioTrack.lecture_section_id == LectureSection.id)

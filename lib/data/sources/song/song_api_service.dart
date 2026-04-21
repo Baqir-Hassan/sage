@@ -194,9 +194,7 @@ class SongApiServiceImpl extends SongApiService {
       final body = jsonDecode(response.body) as List<dynamic>;
       final tracks = body.cast<Map<String, dynamic>>().map((track) {
         final mediaUrl = track['media_url'] as String?;
-        final fullUrl = mediaUrl == null || mediaUrl.isEmpty
-            ? null
-            : '${ApiUrls.baseUrl}$mediaUrl';
+        final fullUrl = _resolveMediaUrl(mediaUrl);
 
         return {
           ...track,
@@ -265,9 +263,7 @@ class SongApiServiceImpl extends SongApiService {
         (sum, item) => sum + ((item['duration_seconds'] as num?)?.round() ?? 0),
       );
       final firstTrackUrl = tracks.first['media_url'] as String?;
-      final fullUrl = firstTrackUrl == null || firstTrackUrl.isEmpty
-          ? null
-          : '${ApiUrls.baseUrl}$firstTrackUrl';
+      final fullUrl = _resolveMediaUrl(firstTrackUrl);
       return _TrackInfo(durationSeconds: totalDuration, audioUrl: fullUrl);
     } catch (_) {
       return const _TrackInfo(durationSeconds: 0, audioUrl: null);
@@ -309,6 +305,16 @@ class SongApiServiceImpl extends SongApiService {
       }
     } catch (_) {}
     return fallback;
+  }
+
+  String? _resolveMediaUrl(String? mediaUrl) {
+    if (mediaUrl == null || mediaUrl.isEmpty) {
+      return null;
+    }
+    if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
+      return mediaUrl;
+    }
+    return '${ApiUrls.baseUrl}$mediaUrl';
   }
 }
 

@@ -1,5 +1,9 @@
+import os
 from pathlib import Path
+from urllib.parse import urlparse
 from uuid import uuid4
+
+import boto3
 
 from app.core.config import get_settings
 
@@ -41,10 +45,99 @@ class LocalStorageService:
         audio_dir.mkdir(parents=True, exist_ok=True)
         return audio_dir / f"{section_id}.mp3"
 
+    def persist_generated_audio(self, output_path: Path, lecture_id: str, section_id: str) -> str:
+        return str(output_path)
+
     def read_bytes(self, storage_key: str) -> bytes:
         return self.resolve_storage_path(storage_key).read_bytes()
+
+    def delete(self, storage_key: str) -> None:
+        try:
+            storage_path = self.resolve_storage_path(storage_key)
+        except FileNotFoundError:
+            return
+        if storage_path.exists():
+            storage_path.unlink()
 
     def to_media_url(self, storage_key: str) -> str:
         storage_path = self.resolve_storage_path(storage_key).resolve()
         relative_path = storage_path.relative_to(self.base_path)
         return f"/media/{relative_path.as_posix()}"
+
+
+class S3StorageService:
+    def __init__(self) -> None:
+        self.settings = get_settings()
+        self.base_path = self.settings.local_storage_dir
+        self.base_path.mkdir(parents=True, exist_ok=True)
+        client_kwargs: dict[str, str] = {"region_name": self.settings.aws_region}
+        if self.settings.aws_s3_endpoint_url:
+            client_kwargs["endpoint_url"] = self.settings.aws_s3_endpoint_url
+        self.client = boto3.client("s3", **client_kwargs)
+
+    def save_upload(self, filename: str, content: bytes) -> str:
+        safe_name = filename.replace(" ", "_")
+        key = f"uploads/{uuid4()}-{safe_name}"
+        self.client.put_object(
+            Bucket=self.settings.s3_bucket_raw,
+            Key=key,
+            Body=content,
+        )
+        return self._build_s3_uri(self.settings.s3_bucket_raw, key)
+
+    def resolve_storage_path(self, storage_key: str) -> Path:
+        bucket, key = self._parse_s3_uri(storage_key)
+        local_path = self.base_path / "tmp" / bucket / key.replace("/", os.sep)
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        if not local_path.exists():
+            self.client.download_file(bucket, key, str(local_path))
+        return local_path
+
+    def build_audio_path(self, lecture_id: str, section_id: str) -> Path:
+        audio_dir = self.base_path / "tmp" / "audio" / lecture_id
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        return audio_dir / f"{section_id}.mp3"
+
+    def persist_generated_audio(self, output_path: Path, lecture_id: str, section_id: str) -> str:
+        key = f"audio/{lecture_id}/{section_id}.mp3"
+        with output_path.open("rb") as audio_file:
+            self.client.upload_fileobj(
+                audio_file,
+                self.settings.s3_bucket_audio,
+                key,
+                ExtraArgs={"ContentType": "audio/mpeg"},
+            )
+        return self._build_s3_uri(self.settings.s3_bucket_audio, key)
+
+    def read_bytes(self, storage_key: str) -> bytes:
+        bucket, key = self._parse_s3_uri(storage_key)
+        response = self.client.get_object(Bucket=bucket, Key=key)
+        return response["Body"].read()
+
+    def delete(self, storage_key: str) -> None:
+        bucket, key = self._parse_s3_uri(storage_key)
+        self.client.delete_object(Bucket=bucket, Key=key)
+
+    def to_media_url(self, storage_key: str) -> str:
+        bucket, key = self._parse_s3_uri(storage_key)
+        return self.client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": key},
+            ExpiresIn=self.settings.s3_presign_expiry_seconds,
+        )
+
+    def _build_s3_uri(self, bucket: str, key: str) -> str:
+        return f"s3://{bucket}/{key}"
+
+    def _parse_s3_uri(self, storage_key: str) -> tuple[str, str]:
+        parsed = urlparse(storage_key)
+        if parsed.scheme != "s3" or not parsed.netloc or not parsed.path:
+            raise ValueError(f"Unsupported S3 storage key: {storage_key}")
+        return parsed.netloc, parsed.path.lstrip("/")
+
+
+def get_storage_service() -> LocalStorageService | S3StorageService:
+    settings = get_settings()
+    if settings.use_s3_storage:
+        return S3StorageService()
+    return LocalStorageService()

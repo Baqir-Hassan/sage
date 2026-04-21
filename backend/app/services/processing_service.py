@@ -17,7 +17,7 @@ from app.models.subject import Subject
 from app.services.audio_service import AudioGenerationService
 from app.services.groq_service import GroqService
 from app.services.parser_service import ParserService
-from app.services.storage_service import LocalStorageService
+from app.services.storage_service import get_storage_service
 from app.services.voice_service import resolve_tts_voice
 
 
@@ -26,7 +26,7 @@ class ProcessingService:
         self.db = db
         self.parser = ParserService()
         self.llm = GroqService()
-        self.storage = LocalStorageService()
+        self.storage = get_storage_service()
         self.audio = AudioGenerationService()
 
     def process_document(self, document_id: str) -> None:
@@ -305,7 +305,7 @@ class ProcessingService:
             output_path = self.storage.build_audio_path(lecture.id, section.id)
             track = AudioTrack(
                 lecture_section_id=section.id,
-                storage_key=str(output_path),
+                storage_key="",
                 duration_seconds=section.estimated_duration_seconds,
                 status="processing",
             )
@@ -313,6 +313,7 @@ class ProcessingService:
             self.db.flush()
 
             self.audio.generate_section_audio(section.script_text, voice_code, output_path)
+            track.storage_key = self.storage.persist_generated_audio(output_path, lecture.id, section.id)
             track.status = "ready"
 
     def _clear_existing_audio_and_sections(self, lecture: Lecture) -> None:
@@ -320,9 +321,7 @@ class ProcessingService:
             if section.audio_track:
                 storage_key = section.audio_track.storage_key
                 if storage_key:
-                    audio_path = self.storage.resolve_storage_path(storage_key)
-                    if audio_path.exists():
-                        audio_path.unlink()
+                    self.storage.delete(storage_key)
                 self.db.delete(section.audio_track)
             self.db.delete(section)
         self.db.flush()

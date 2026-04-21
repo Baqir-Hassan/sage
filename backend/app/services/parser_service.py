@@ -3,12 +3,12 @@ from pathlib import Path
 import fitz
 from pptx import Presentation
 
-from app.services.storage_service import LocalStorageService
+from app.services.storage_service import get_storage_service
 
 
 class ParserService:
     def __init__(self) -> None:
-        self.storage = LocalStorageService()
+        self.storage = get_storage_service()
 
     def extract_text(self, storage_key: str, content_type: str) -> str:
         resolved_path = self.storage.resolve_storage_path(storage_key)

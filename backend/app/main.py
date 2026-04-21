@@ -49,7 +49,8 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
-app.mount("/media", StaticFiles(directory=settings.local_storage_dir), name="media")
+if not settings.use_s3_storage:
+    app.mount("/media", StaticFiles(directory=settings.local_storage_dir), name="media")
 
 
 @app.get("/health", tags=["health"])

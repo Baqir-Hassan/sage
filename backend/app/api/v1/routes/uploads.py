@@ -12,7 +12,7 @@ from app.models.processing_job import ProcessingJob
 from app.models.user import User
 from app.schemas.upload import UploadListItemResponse, UploadResponse, UploadStatusResponse, VoiceOption
 from app.services.processing_service import ProcessingService
-from app.services.storage_service import LocalStorageService
+from app.services.storage_service import get_storage_service
 
 
 router = APIRouter()
@@ -27,7 +27,7 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UploadResponse:
-    storage = LocalStorageService()
+    storage = get_storage_service()
     file_bytes = await file.read()
     storage_key = storage.save_upload(file.filename or "upload", file_bytes)
 
@@ -141,7 +141,7 @@ def delete_upload(
     if document.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
 
-    storage = LocalStorageService()
+    storage = get_storage_service()
 
     lectures = db.scalars(select(Lecture).where(Lecture.document_id == document.id)).all()
     for lecture in lectures:
@@ -154,10 +154,8 @@ def delete_upload(
         db.delete(job)
 
     try:
-        source_path = storage.resolve_storage_path(document.storage_key)
-        if source_path.exists():
-            source_path.unlink()
-    except FileNotFoundError:
+        storage.delete(document.storage_key)
+    except (FileNotFoundError, ValueError):
         pass
 
     db.delete(document)

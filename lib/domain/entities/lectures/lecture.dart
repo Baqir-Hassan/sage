@@ -3,6 +3,7 @@ class LectureEntity {
   final String summary;
   final num duration;
   final String? audioUrl;
+  final String? localAudioPath;
   final String? imageUrl;
   final bool isSaved;
   final String lectureId;
@@ -12,6 +13,7 @@ class LectureEntity {
     required this.summary,
     required this.duration,
     this.audioUrl,
+    this.localAudioPath,
     this.imageUrl,
     required this.isSaved,
     required this.lectureId,

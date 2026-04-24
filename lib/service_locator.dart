@@ -5,6 +5,7 @@ import 'package:sage/data/repository/auth/auth_repository_impl.dart';
 import 'package:sage/data/repository/lecture/lecture_repository_impl.dart';
 import 'package:sage/data/sources/auth/auth_api_service.dart';
 import 'package:sage/data/sources/lecture/lecture_api_service.dart';
+import 'package:sage/data/sources/offline/offline_audio_service.dart';
 import 'package:sage/data/sources/upload/upload_api_service.dart';
 import 'package:sage/domain/repository/auth/auth.dart';
 import 'package:sage/domain/repository/lecture/lecture.dart';
@@ -46,6 +47,13 @@ Future<void> initializeDependencies() async {
 
   sl.registerSingleton<UploadApiService>(
     UploadApiServiceImpl(
+      client: sl<http.Client>(),
+      preferences: sl<SharedPreferences>(),
+    ),
+  );
+
+  sl.registerSingleton<OfflineAudioService>(
+    OfflineAudioService(
       client: sl<http.Client>(),
       preferences: sl<SharedPreferences>(),
     ),

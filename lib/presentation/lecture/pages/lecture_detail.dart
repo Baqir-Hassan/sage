@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sage/common/widgets/appbar/app_bar.dart';
 import 'package:sage/common/widgets/button/basic_app_button.dart';
 import 'package:sage/core/configs/assets/app_images.dart';
 import 'package:sage/core/configs/theme/app_color.dart';
 import 'package:sage/data/sources/lecture/lecture_api_service.dart';
+import 'package:sage/data/sources/offline/offline_audio_service.dart';
 import 'package:sage/domain/entities/lectures/lecture.dart';
 import 'package:sage/presentation/lecture_player/pages/lecture_player.dart';
 import 'package:sage/service_locator.dart';
@@ -25,6 +27,8 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
   bool _isRegenerating = false;
   String? _errorMessage;
   List<Map<String, dynamic>> _tracks = const [];
+  Set<String> _downloadedTrackIds = <String>{};
+  Set<String> _activeDownloadTrackIds = <String>{};
 
   @override
   void initState() {
@@ -188,6 +192,9 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
     final duration = (track['duration_seconds'] as num?)?.round() ?? 0;
     final status = track['status'] as String? ?? 'unknown';
     final mediaUrl = track['media_url'] as String?;
+    final trackId = track['id'] as String? ?? '';
+    final isDownloaded = _downloadedTrackIds.contains(trackId);
+    final isDownloading = _activeDownloadTrackIds.contains(trackId);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -244,16 +251,125 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            _formatDuration(duration),
-            style: const TextStyle(
-              color: AppColors.darkGrey,
-              fontWeight: FontWeight.w600,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _formatDuration(duration),
+                style: const TextStyle(
+                  color: AppColors.darkGrey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (!kIsWeb) ...[
+                const SizedBox(height: 8),
+                if (isDownloading)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton(
+                    onPressed: mediaUrl == null || mediaUrl.isEmpty
+                        ? null
+                        : () => isDownloaded
+                            ? _removeDownloadedTrack(track)
+                            : _downloadTrack(track),
+                    icon: Icon(
+                      isDownloaded
+                          ? Icons.download_done_rounded
+                          : Icons.download_rounded,
+                      color: isDownloaded ? AppColors.primary : AppColors.darkGrey,
+                    ),
+                    tooltip: isDownloaded ? 'Remove offline copy' : 'Download for offline',
+                  ),
+              ],
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _loadDownloadStates(List<Map<String, dynamic>> tracks) async {
+    if (kIsWeb) {
+      _downloadedTrackIds = <String>{};
+      return;
+    }
+
+    final offlineAudioService = sl<OfflineAudioService>();
+    final downloadedTrackIds = <String>{};
+
+    for (final track in tracks) {
+      final trackId = track['id'] as String?;
+      if (trackId == null || trackId.isEmpty) {
+        continue;
+      }
+      if (await offlineAudioService.isLectureDownloaded(trackId)) {
+        downloadedTrackIds.add(trackId);
+      }
+    }
+
+    _downloadedTrackIds = downloadedTrackIds;
+  }
+
+  Future<void> _downloadTrack(Map<String, dynamic> track) async {
+    final trackId = track['id'] as String?;
+    final mediaUrl = track['media_url'] as String?;
+    if (trackId == null || trackId.isEmpty || mediaUrl == null || mediaUrl.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _activeDownloadTrackIds = {..._activeDownloadTrackIds, trackId};
+    });
+
+    try {
+      await sl<OfflineAudioService>().downloadLecture(
+        lectureId: trackId,
+        url: mediaUrl,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _downloadedTrackIds = {..._downloadedTrackIds, trackId};
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lecture section downloaded for offline listening.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to download this lecture section.')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _activeDownloadTrackIds = {..._activeDownloadTrackIds}..remove(trackId);
+      });
+    }
+  }
+
+  Future<void> _removeDownloadedTrack(Map<String, dynamic> track) async {
+    final trackId = track['id'] as String?;
+    if (trackId == null || trackId.isEmpty) {
+      return;
+    }
+
+    await sl<OfflineAudioService>().removeDownloadedLecture(trackId);
+    if (!mounted) return;
+
+    setState(() {
+      _downloadedTrackIds = {..._downloadedTrackIds}..remove(trackId);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Offline lecture section removed.')),
+    );
+  }
+
+  Future<String?> _localPathForTrack(String trackId) {
+    return sl<OfflineAudioService>().getLocalLecturePath(trackId);
   }
 
   Future<void> _loadTracks() async {
@@ -274,10 +390,13 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
           _errorMessage = failure.toString();
         });
       },
-      (data) {
+      (data) async {
+        final tracks = (data as List<dynamic>).cast<Map<String, dynamic>>();
+        await _loadDownloadStates(tracks);
+        if (!mounted) return;
         setState(() {
           _isLoading = false;
-          _tracks = (data as List<dynamic>).cast<Map<String, dynamic>>();
+          _tracks = tracks;
         });
       },
     );
@@ -312,7 +431,7 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
     await _loadTracks();
   }
 
-  void _openTrackPlayer(Map<String, dynamic> track) {
+  Future<void> _openTrackPlayer(Map<String, dynamic> track) async {
     final mediaUrl = track['media_url'] as String?;
     if (mediaUrl == null || mediaUrl.isEmpty) {
       return;
@@ -320,7 +439,10 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
 
     final duration = (track['duration_seconds'] as num?)?.round() ?? 0;
     final sectionTitle = track['title'] as String? ?? 'Lecture Section';
+    final trackId = track['id'] as String? ?? widget.lecture.lectureId;
+    final localAudioPath = await _localPathForTrack(trackId);
 
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -330,9 +452,10 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
             summary: widget.lecture.title,
             duration: duration,
             audioUrl: mediaUrl,
+            localAudioPath: localAudioPath,
             imageUrl: widget.lecture.imageUrl,
             isSaved: widget.lecture.isSaved,
-            lectureId: track['id'] as String? ?? widget.lecture.lectureId,
+            lectureId: trackId,
           ),
         ),
       ),

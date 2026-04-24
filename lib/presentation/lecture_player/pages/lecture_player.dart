@@ -42,9 +42,11 @@ class LecturePlayerPage extends StatelessWidget {
       body: BlocProvider(
         create: (_) => LecturePlayerCubit()
           ..loadLectureAudio(
+            lectureId: lectureEntity.lectureId,
             url: lectureEntity.audioUrl ?? '',
             title: lectureEntity.title,
             summary: lectureEntity.summary,
+            localAudioPath: lectureEntity.localAudioPath,
             imageUrl: lectureEntity.imageUrl,
           ),
         child: BlocBuilder<LecturePlayerCubit, LecturePlayerState>(

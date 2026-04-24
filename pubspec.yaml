@@ -45,6 +45,7 @@ dependencies:
   dartz:
   cloud_firestore:
   just_audio:
+  just_audio_background:
   diacritic:
   http: ^1.2.2
   shared_preferences: ^2.3.2

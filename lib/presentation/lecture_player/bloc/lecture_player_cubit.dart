@@ -1,5 +1,6 @@
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sage/presentation/lecture_player/bloc/lecture_player_state.dart';
 
 class LecturePlayerCubit extends Cubit<LecturePlayerState> {
@@ -25,7 +26,12 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
     );
   }
 
-  Future<void> loadLectureAudio(String url) async {
+  Future<void> loadLectureAudio({
+    required String url,
+    required String title,
+    required String summary,
+    String? imageUrl,
+  }) async {
     if (url.isEmpty) {
       emit(
         LecturePlayerFailure(),
@@ -34,7 +40,20 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
     }
 
     try {
-      await audioPlayer.setUrl(url);
+      await audioPlayer.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(url),
+          tag: MediaItem(
+            id: url,
+            title: title,
+            album: 'Sage Lecture',
+            artist: summary,
+            artUri: (imageUrl != null && imageUrl.isNotEmpty)
+                ? Uri.parse(imageUrl)
+                : null,
+          ),
+        ),
+      );
       emit(
         LecturePlayerLoaded(),
       );
@@ -47,7 +66,7 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
 
   void togglePlayback() {
     if (audioPlayer.playing) {
-      audioPlayer.stop();
+      audioPlayer.pause();
     } else {
       audioPlayer.play();
     }

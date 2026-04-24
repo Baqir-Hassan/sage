@@ -13,6 +13,7 @@ class SubjectsTab extends StatefulWidget {
 
 class _SubjectsTabState extends State<SubjectsTab> {
   bool _isLoading = true;
+  String? _deletingSubjectId;
   String? _error;
   List<Map<String, dynamic>> _subjects = [];
 
@@ -20,6 +21,67 @@ class _SubjectsTabState extends State<SubjectsTab> {
   void initState() {
     super.initState();
     _loadSubjects();
+  }
+
+  Future<void> _confirmDeleteSubject(Map<String, dynamic> subject) async {
+    final subjectId = subject['id'] as String?;
+    final subjectName = subject['name'] as String? ?? 'this subject';
+    if (subjectId == null || subjectId.isEmpty) {
+      return;
+    }
+
+    final shouldDelete = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete subject?'),
+            content: Text(
+              'This will remove the subject grouping, but keep all of its lectures and audio. '
+              '$subjectName will be detached from related uploads and playlists.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setState(() {
+      _deletingSubjectId = subjectId;
+    });
+
+    final result = await sl<LectureApiService>().deleteSubject(subjectId);
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        setState(() {
+          _deletingSubjectId = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(failure.toString())),
+        );
+      },
+      (_) {
+        setState(() {
+          _deletingSubjectId = null;
+          _subjects.removeWhere((item) => item['id'] == subjectId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$subjectName deleted.')),
+        );
+      },
+    );
   }
 
   Future<void> _loadSubjects() async {
@@ -100,13 +162,38 @@ class _SubjectsTabState extends State<SubjectsTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.white,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      if (_deletingSubjectId == subject['id'])
+                        const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          splashRadius: 18,
+                          onPressed: () => _confirmDeleteSubject(subject),
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: AppColors.greyTitle,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Text(

@@ -1,6 +1,6 @@
 class ApiUrls {
   static const String baseUrl =
-      String.fromEnvironment('API_BASE_URL', defaultValue: 'http://127.0.0.1:8000');
+      String.fromEnvironment('API_BASE_URL', defaultValue: 'https://api.sageai.live');
   static const String apiV1 = '$baseUrl/api/v1';
 
   static const String signup = '$apiV1/auth/signup';
@@ -15,6 +15,7 @@ class ApiUrls {
   static String lectureTracks(String lectureId) =>
       '$lectures/$lectureId/tracks';
   static String lectureById(String lectureId) => '$lectures/$lectureId';
+  static String subjectById(String subjectId) => '$subjects/$subjectId';
   static String lectureRegenerate(String lectureId) =>
       '$lectures/$lectureId/regenerate-content';
   static String uploadById(String documentId) => '$uploads/$documentId';

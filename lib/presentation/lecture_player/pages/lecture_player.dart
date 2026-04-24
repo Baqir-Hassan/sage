@@ -39,7 +39,13 @@ class LecturePlayerPage extends StatelessWidget {
         ),
       ),
       body: BlocProvider(
-        create: (_) => LecturePlayerCubit()..loadLectureAudio(lectureEntity.audioUrl ?? ''),
+        create: (_) => LecturePlayerCubit()
+          ..loadLectureAudio(
+            url: lectureEntity.audioUrl ?? '',
+            title: lectureEntity.title,
+            summary: lectureEntity.summary,
+            imageUrl: lectureEntity.imageUrl,
+          ),
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),

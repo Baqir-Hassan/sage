@@ -12,6 +12,7 @@ abstract class LectureApiService {
   Future<Either> getLecture(String lectureId);
   Future<Either> getSubjects();
   Future<Either> getSubjectLectures(String subjectId);
+  Future<Either> deleteSubject(String subjectId);
   Future<Either> getLectureTracks(String lectureId);
   Future<Either> toggleSavedLecture(String lectureId);
   Future<bool> isSavedLecture(String lectureId);
@@ -113,6 +114,24 @@ class LectureApiServiceImpl extends LectureApiService {
       final lectures = body.cast<Map<String, dynamic>>();
       final items = await Future.wait(lectures.map(_buildLectureCard));
       return Right(items);
+    } catch (_) {
+      return const Left('Unable to connect to the backend.');
+    }
+  }
+
+  @override
+  Future<Either> deleteSubject(String subjectId) async {
+    try {
+      final response = await _client.delete(
+        Uri.parse(ApiUrls.subjectById(subjectId)),
+        headers: _authorizedHeaders(),
+      );
+
+      if (_isSuccess(response.statusCode)) {
+        return const Right(true);
+      }
+
+      return Left(_extractError(response.body, 'Unable to delete subject.'));
     } catch (_) {
       return const Left('Unable to connect to the backend.');
     }

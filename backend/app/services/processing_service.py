@@ -140,6 +140,9 @@ class ProcessingService:
             "and in that case keep the number of sections modest. "
             "Each section must contain title and script. "
             "Each script should sound like a spoken lecture, not bullet points, and should usually be between 120 and 220 words. "
+            "Write in the voice of a real teacher speaking to students. The opening of the first section must begin like "
+            "an actual lesson introduction, for example by saying what today's lecture is about or what students will learn today. "
+            "Avoid robotic phrasing, avoid reading the notes like a list, and keep the tone warm, clear, and instructional. "
             "Expand abbreviations, connect ideas naturally, and explain the meaning of keywords from the notes. "
             "Do not use markdown, code fences, or extra text outside the JSON.\n"
             f"Filename: {filename}\n"
@@ -264,7 +267,7 @@ class ProcessingService:
         lines = [line.strip(" -\t") for line in raw_text.splitlines() if line.strip()]
         if not lines:
             return (
-                f"This is section {index}. The uploaded material did not contain enough readable text "
+                f"Today's lecture section {index} focuses on the uploaded material. The document did not contain enough readable text "
                 "to generate a detailed lecture for this part."
             )
 
@@ -274,8 +277,11 @@ class ProcessingService:
         spoken_points = " ".join(
             f"A key idea here is {point}." for point in normalized_points if point
         )
+        intro = (
+            f"Today's lecture is about {topic}. " if index == 1 else f"In this part of the lecture, we turn our attention to {topic}. "
+        )
         return (
-            f"In section {index}, we focus on {topic}. "
+            f"{intro}"
             f"{spoken_points} "
             f"Taken together, these points explain the main idea behind {topic} "
             "and give a foundation for the rest of the lecture."

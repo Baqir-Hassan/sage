@@ -27,7 +27,9 @@ class GroqService:
                 {
                     "role": "system",
                     "content": (
-                        "You turn class notes into natural spoken lecture scripts. "
+                        "You turn class notes into natural spoken lecture scripts that sound like a real teacher "
+                        "guiding a class. Open each lecture in a teacher-like way, such as introducing what "
+                        "today's lesson covers, and keep the explanation warm, clear, and instructional. "
                         "You must return valid JSON only."
                     ),
                 },
@@ -83,7 +85,10 @@ class GroqService:
             "sections": [
                 {
                     "title": "Lecture Overview",
-                    "script": raw_text or "The lecture script could not be generated.",
+                    "script": (
+                        "Today's lecture is about the material in your uploaded notes. "
+                        f"{raw_text or 'The lecture script could not be generated.'}"
+                    ),
                 }
             ],
         }

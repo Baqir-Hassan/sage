@@ -6,6 +6,7 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.document import Document
 from app.models.lecture import Lecture
+from app.models.playlist import Playlist
 from app.models.subject import Subject
 from app.models.user import User
 from app.schemas.lecture import LectureResponse
@@ -73,3 +74,53 @@ def list_subject_lectures(
         )
         for lecture in lectures
     ]
+
+
+@router.delete("/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_subject(
+    subject_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    subject = db.get(Subject, subject_id)
+    if not subject:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subject not found.",
+        )
+
+    has_other_user_documents = db.scalar(
+        select(func.count(Document.id))
+        .where(Document.subject_id == subject_id)
+        .where(Document.user_id != current_user.id)
+    ) or 0
+    has_other_user_playlists = db.scalar(
+        select(func.count(Playlist.id))
+        .where(Playlist.subject_id == subject_id)
+        .where(Playlist.user_id.is_not(None))
+        .where(Playlist.user_id != current_user.id)
+    ) or 0
+
+    if has_other_user_documents or has_other_user_playlists:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This subject is still used by another account and cannot be deleted yet."
+            ),
+        )
+
+    for document in db.scalars(
+        select(Document).where(
+            Document.subject_id == subject_id,
+            Document.user_id == current_user.id,
+        )
+    ).all():
+        document.subject_id = None
+
+    for playlist in db.scalars(
+        select(Playlist).where(Playlist.subject_id == subject_id)
+    ).all():
+        playlist.subject_id = None
+
+    db.delete(subject)
+    db.commit()

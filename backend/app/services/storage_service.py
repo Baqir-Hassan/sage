@@ -107,6 +107,10 @@ class S3StorageService:
         return self._build_s3_uri(self.settings.s3_bucket_raw, key)
 
     def resolve_storage_path(self, storage_key: str) -> Path:
+        candidate = Path(storage_key)
+        if candidate.exists():
+            return candidate
+
         bucket, key = self._parse_s3_uri(storage_key)
         local_path = self.base_path / "tmp" / bucket / key.replace("/", os.sep)
         local_path.parent.mkdir(parents=True, exist_ok=True)

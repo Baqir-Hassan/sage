@@ -331,10 +331,6 @@ class ProcessingService:
         lecture.sections = []
 
     def _extract_text_for_document(self, document: Document) -> str:
-        resolved_storage_path = self.storage.resolve_storage_path(document.storage_key)
-        if document.storage_key != str(resolved_storage_path):
-            document.storage_key = str(resolved_storage_path)
-            self.db.commit()
         return self.parser.extract_text(document.storage_key, document.content_type)
 
     def _get_sections_for_lecture(self, lecture_id: str) -> list[LectureSection]:

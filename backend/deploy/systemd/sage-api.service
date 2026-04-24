@@ -1,0 +1,17 @@
+[Unit]
+Description=Sage FastAPI backend
+After=network.target
+
+[Service]
+# Update User and Group for your AMI if it does not use "ubuntu".
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/sage/backend
+EnvironmentFile=/opt/sage/backend/.env
+ExecStart=/opt/sage/backend/scripts/start_api.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

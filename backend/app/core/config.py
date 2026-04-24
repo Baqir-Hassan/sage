@@ -18,6 +18,11 @@ class Settings(BaseSettings):
 
     database_url: str = Field(default="sqlite:///./app.db", alias="DATABASE_URL")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    queue_provider: str = Field(default="celery", alias="QUEUE_PROVIDER")
+    sqs_queue_url: str = Field(default="", alias="SQS_QUEUE_URL")
+    sqs_region: str = Field(default="", alias="SQS_REGION")
+    sqs_wait_time_seconds: int = Field(default=20, alias="SQS_WAIT_TIME_SECONDS")
+    sqs_max_messages: int = Field(default=1, alias="SQS_MAX_MESSAGES")
     storage_provider: str = Field(default="local", alias="STORAGE_PROVIDER")
     frontend_origins: str = Field(
         default="http://localhost:3000,http://localhost:8080,http://localhost:5173",

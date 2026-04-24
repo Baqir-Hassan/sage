@@ -9,6 +9,10 @@ class HomeLectureItem(BaseModel):
     description: str | None = None
     voice_option: str
     status: str
+    total_duration_seconds: int = 0
+    total_track_count: int = 0
+    ready_track_count: int = 0
+    primary_audio_url: str | None = None
 
 
 class HomePlaylistItem(BaseModel):

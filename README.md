@@ -1,92 +1,174 @@
-# 🎧 Spotify With Flutter
+# Sage
 
-A beautiful and interactive **Spotify Clone** built using Flutter. Show some ❤️ by starring ⭐ this repository if you like it!
+Sage is a final year project that turns study material into spoken lectures. Users can upload `PDF` and `PPTX` notes, choose a narration voice, and generate audio lecture sections that can be played back inside the Flutter app.
 
-###### Contact for work, email: chunhthanhde.dev@gmail.com
+## What It Does
 
-<br>
+- Upload lecture notes as `PDF` or `PPTX`
+- Extract and structure the note content on the backend
+- Generate lecture-style narration text
+- Convert lecture sections into audio
+- Organize output by subject
+- Browse recent lectures, saved lectures, uploads, and subject libraries
 
-<img src="assets/images/spotify_logo.png" alt="spotify logo"/>
+## Project Structure
 
-<br>
+This repository contains two main parts:
 
-![GitHub stars](https://img.shields.io/github/stars/Flutter-Journey/Spotify-With-Flutter?style=social)
-![GitHub forks](https://img.shields.io/github/forks/Flutter-Journey/Spotify-With-Flutter?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/Flutter-Journey/Spotify-With-Flutter?style=social)
+- `lib/`: Flutter frontend
+- `backend/`: FastAPI backend, processing pipeline, Celery worker, and local storage support
 
-<a href="https://www.linkedin.com/in/chunhthanhde/">
-<img src="https://img.shields.io/badge/Support-Recommend%2FEndorse%20me%20on%20Linkedin-blue?style=for-the-badge&logo=linkedin" alt="Support me on LinkedIn" />
-</a>
+## Tech Stack
 
-<a href="https://www.buymeacoffee.com/chunhthanhde" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/yellow_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+### Frontend
 
-## 🎵 Overview
+- Flutter
+- Dart
+- BLoC / Cubit state management
+- `just_audio`
+- `flutter_svg`
+- Firebase auth support from the original app base
 
-**Spotify With Flutter** is a demo music streaming app inspired by Spotify, featuring a smooth user interface and basic functionalities like firebase login, play music, and favorites song screen. Developed using Flutter, it is available on Android, iOS
+### Backend
 
-> Note: This project uses mock data and is not affiliated with or integrated with Spotify’s official API.
+- FastAPI
+- SQLAlchemy
+- Celery
+- Redis
+- SQLite for local development
+- AWS S3-ready storage configuration
+- PyMuPDF for PDF parsing
+- `python-pptx` for PowerPoint parsing
+- `edge-tts` for audio generation
+- Groq for lecture/script generation
 
-## 🖥️ Screens and Features
+## Current Flow
 
-- **Home Screen**: Displays playlists and recommended songs.
-- **Playlist Screen**: View and manage your playlists.
-- **Song Player Screen**: Play songs with full controls.
-- **Profile Screen**: View user information and favorite tracks.
+1. Sign in from the Flutter app
+2. Upload a `PDF` or `PPTX`
+3. Choose a voice option
+4. Select an existing subject or enter a new subject name
+5. Backend stores the upload and queues processing with Celery
+6. User polls processing status from the app
+7. Generated lecture sections become playable as audio
 
-## 🎨 Figma Design
+## Supported File Types
 
-- [Light Mode Design](https://www.figma.com/community/file/1166665330965959412/spotify-redesign-free-ui-kit-light)
-- [Dark Mode Design](https://www.figma.com/community/file/1172466818809176172/spotify-redesign-free-ui-kit-dark-mode)
+- `PDF`
+- `PPTX`
 
-## 🎮 Demo
+Legacy `.ppt` files are not supported.
 
-Check out how the app looks in action! You can view a demo [here](https://www.youtube.com/shorts/aEHOczCZQ00).
+## Local Development
 
-<details>
-<summary> <em> Gif Demo</em> 🕹️
-</summary>
+### 1. Backend setup
 
-<br>
+From the project root:
 
-| Light Mode                                                                 | Dark Mode                                                                 |
-|---------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| ![Light Mode](https://raw.githubusercontent.com/Flutter-Journey/Spotify-With-Flutter/refs/heads/main/media/gif/spotify_light.gif) | ![Dark Mode](https://raw.githubusercontent.com/Flutter-Journey/Spotify-With-Flutter/refs/heads/main/media/gif/spotify_dark.gif) |
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+```
 
-<br>
-</details>
+Update `.env` with your own values, especially:
 
-## 🏏 Screen
+- `SECRET_KEY`
+- `GROQ_API_KEY`
+- optional AWS S3 settings if you are not using local storage
 
-| Login Screen                                                              | Choose Mode Screen                                                       | Home Screen                                                              |
-|---------------------------------------------------------------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| ![Login Screen](https://raw.githubusercontent.com/Flutter-Journey/Spotify-With-Flutter/refs/heads/main/media/image/login_screen.png) | ![Choose Mode Screen](https://raw.githubusercontent.com/Flutter-Journey/Spotify-With-Flutter/refs/heads/main/media/image/choose_mode_screen.png) | ![Home Screen](https://raw.githubusercontent.com/Flutter-Journey/Spotify-With-Flutter/refs/heads/main/media/image/home_screen.png) |
+### 2. Start Redis
 
+If you have Docker Desktop installed:
 
-## 🛠️ Technologies Used
+```powershell
+docker run --name sage-redis -p 6379:6379 redis
+```
 
-- **Flutter**: Framework for building natively compiled applications.
-- **Dart**: The programming language used for Flutter development.
-- **Firebase**: Backend as a Service for authentication, storage, and database.
-- **BLoC (Business Logic Component)**: For state management.
-- **Clean Architecture**: For scalable and maintainable code.
+If the container already exists:
 
-## 🌟 Conclusion
+```powershell
+docker start sage-redis
+```
 
-**Spotify With Flutter** provides a beautiful and functional music streaming experience, closely resembling the original Spotify app. Enjoy the experience of managing playlists and listening to your favorite songs with this Flutter-based app!
+### 3. Start the Celery worker
 
-## Star History
+Open a new terminal from the project root:
 
-<a href="https://star-history.com/#Flutter-Journey/Spotify-With-Flutter&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Flutter-Journey/Spotify-With-Flutter&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Flutter-Journey/Spotify-With-Flutter&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Flutter-Journey/Spotify-With-Flutter&type=Date" />
- </picture>
-</a>
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m celery -A app.workers.celery_app.celery_app worker --loglevel=info
+```
 
-<div align="center">
+### 4. Start the FastAPI server
 
-#### Made by Flutter <img src="https://raw.githubusercontent.com/Flutter-Journey/.github/refs/heads/main/media/flutter_icon.png" height="15"> with Love ❤️ | Developed by [ChunhThanhDe](https://github.com/chunhthanhde)
+Open another terminal from the project root:
 
-</div>
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --reload
+```
 
+Backend docs:
+
+- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### 5. Run the Flutter app
+
+From the project root:
+
+```powershell
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000
+```
+
+`API_BASE_URL` is configurable and defaults to `http://127.0.0.1:8000`.
+
+## Environment Notes
+
+Important backend environment variables:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `STORAGE_PROVIDER`
+- `LOCAL_STORAGE_PATH`
+- `GROQ_API_KEY`
+- `DEFAULT_MALE_VOICE`
+- `DEFAULT_FEMALE_VOICE`
+
+Local development currently works with:
+
+- SQLite database
+- local file storage in `backend/storage`
+- Redis as the Celery broker/result backend
+
+## Main API Areas
+
+- `/api/v1/auth`
+- `/api/v1/uploads`
+- `/api/v1/lectures`
+- `/api/v1/library/home`
+- `/api/v1/subjects`
+- `/api/v1/playlists`
+
+## Notes
+
+- Upload processing now depends on Redis and the Celery worker being available.
+- The app has been refactored away from its original Spotify clone structure, but some legacy Firebase collection names and older asset identifiers may still remain in non-user-facing parts of the codebase.
+- For production deployment, the backend is already structured to move from local storage to S3-backed storage.
+
+## Future Improvements
+
+- Add step-based processing progress for uploads
+- Improve lecture artwork and branding
+- Expand backend test coverage
+- Add deployment automation for AWS
+- Replace remaining legacy clone assets and storage identifiers
+
+## License
+
+This project was built from an MIT-licensed Flutter starter/clone and has been adapted into a notes-to-audio lecture platform. If you distribute this project, keep the required MIT license attribution from the original source where applicable.

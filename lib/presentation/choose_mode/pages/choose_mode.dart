@@ -3,12 +3,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:spotify_with_flutter/common/widgets/button/basic_app_button.dart';
-import 'package:spotify_with_flutter/core/configs/assets/app_images.dart';
-import 'package:spotify_with_flutter/core/configs/assets/app_vectors.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/presentation/auth/pages/signup_or_signin.dart';
-import 'package:spotify_with_flutter/presentation/choose_mode/bloc/theme_cubit.dart';
+import 'package:sage/common/widgets/button/basic_app_button.dart';
+import 'package:sage/core/configs/assets/app_images.dart';
+import 'package:sage/core/configs/assets/app_vectors.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/presentation/auth/pages/signup_or_signin.dart';
+import 'package:sage/presentation/choose_mode/bloc/theme_cubit.dart';
 
 class ChooseModePage extends StatefulWidget {
   const ChooseModePage({super.key});
@@ -49,7 +49,14 @@ class _ChooseModePageState extends State<ChooseModePage> {
                   children: [
                     Align(
                       alignment: Alignment.topCenter,
-                      child: SvgPicture.asset(AppVectors.logo),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 70.0),
+                      child: SvgPicture.asset(
+                        AppVectors.logo,
+                        height: 100,
+                        width: 550,
+                      ),
+                      ),
                     ),
                     const Spacer(),
                     const Text(

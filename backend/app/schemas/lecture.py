@@ -15,6 +15,10 @@ class LectureResponse(BaseModel):
     voice_option: str
     tts_voice_code: str | None = None
     status: str
+    total_duration_seconds: int = 0
+    total_track_count: int = 0
+    ready_track_count: int = 0
+    primary_audio_url: str | None = None
 
 
 class VoiceUpdateRequest(BaseModel):

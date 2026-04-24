@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:spotify_with_flutter/common/widgets/appbar/app_bar.dart';
-import 'package:spotify_with_flutter/common/widgets/button/basic_app_button.dart';
-import 'package:spotify_with_flutter/core/configs/assets/app_images.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/data/sources/song/song_api_service.dart';
-import 'package:spotify_with_flutter/domain/entities/songs/songs.dart';
-import 'package:spotify_with_flutter/presentation/song_player.dart/pages/song_player.dart';
-import 'package:spotify_with_flutter/service_locator.dart';
+import 'package:sage/common/widgets/appbar/app_bar.dart';
+import 'package:sage/common/widgets/button/basic_app_button.dart';
+import 'package:sage/core/configs/assets/app_images.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/data/sources/lecture/lecture_api_service.dart';
+import 'package:sage/domain/entities/lectures/lecture.dart';
+import 'package:sage/presentation/lecture_player/pages/lecture_player.dart';
+import 'package:sage/service_locator.dart';
 
 class LectureDetailPage extends StatefulWidget {
-  final SongEntity lecture;
+  final LectureEntity lecture;
 
   const LectureDetailPage({
     super.key,
@@ -116,7 +116,7 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  widget.lecture.artist,
+                  widget.lecture.summary,
                   maxLines: 3,
                   overflow: TextOverflow.fade,
                   style: const TextStyle(
@@ -131,7 +131,7 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: Image.asset(
-              AppImages.homeArtist,
+              AppImages.homeArtwork,
               width: 96,
               height: 96,
               fit: BoxFit.cover,
@@ -232,7 +232,7 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  status == 'completed'
+                  status == 'ready'
                       ? 'Ready to play'
                       : 'Status: $status',
                   style: const TextStyle(
@@ -263,7 +263,7 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
     });
 
     final result =
-        await sl<SongApiService>().getLectureTracks(widget.lecture.songId);
+        await sl<LectureApiService>().getLectureTracks(widget.lecture.lectureId);
 
     if (!mounted) return;
 
@@ -289,7 +289,7 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
     });
 
     final result =
-        await sl<SongApiService>().regenerateLecture(widget.lecture.songId);
+        await sl<LectureApiService>().regenerateLecture(widget.lecture.lectureId);
 
     if (!mounted) return;
 
@@ -324,15 +324,15 @@ class _LectureDetailPageState extends State<LectureDetailPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SongPlayerPage(
-          songEntity: SongEntity(
+        builder: (_) => LecturePlayerPage(
+          lectureEntity: LectureEntity(
             title: sectionTitle,
-            artist: widget.lecture.title,
+            summary: widget.lecture.title,
             duration: duration,
             audioUrl: mediaUrl,
             imageUrl: widget.lecture.imageUrl,
-            isFavorite: widget.lecture.isFavorite,
-            songId: track['id'] as String? ?? widget.lecture.songId,
+            isSaved: widget.lecture.isSaved,
+            lectureId: track['id'] as String? ?? widget.lecture.lectureId,
           ),
         ),
       ),

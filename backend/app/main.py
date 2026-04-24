@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
@@ -19,6 +20,7 @@ from app.models import (  # noqa: F401
     Subject,
     User,
 )
+from app.services.readiness_service import collect_readiness_status
 
 
 settings = get_settings()
@@ -56,3 +58,10 @@ if not settings.use_s3_storage:
 @app.get("/health", tags=["health"])
 def healthcheck() -> dict[str, str]:
     return {"status": "ok", "environment": settings.app_env}
+
+
+@app.get("/ready", tags=["health"])
+def readiness_check():
+    readiness = collect_readiness_status()
+    status_code = 200 if readiness["status"] == "ready" else 503
+    return JSONResponse(status_code=status_code, content=readiness)

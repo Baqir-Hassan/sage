@@ -2,11 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dartz/dartz.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:spotify_with_flutter/core/constants/app_urls.dart';
-import 'package:spotify_with_flutter/data/models/auth/create_user_req.dart';
-import 'package:spotify_with_flutter/data/models/auth/signin_user_req.dart';
-import 'package:spotify_with_flutter/data/models/auth/user.dart';
-import 'package:spotify_with_flutter/domain/entities/auth/user.dart';
+import 'package:sage/core/constants/app_urls.dart';
+import 'package:sage/data/models/auth/create_user_req.dart';
+import 'package:sage/data/models/auth/signin_user_req.dart';
+import 'package:sage/data/models/auth/user.dart';
+import 'package:sage/domain/entities/auth/user.dart';
 
 abstract class AuthFirebaseService {
   Future<Either> signup(CreateUserReq createUserReq);

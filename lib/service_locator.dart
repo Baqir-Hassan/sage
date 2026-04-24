@@ -1,21 +1,21 @@
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:spotify_with_flutter/data/repository/auth/auth_repository_impl.dart';
-import 'package:spotify_with_flutter/data/repository/song/song_repository_impl.dart';
-import 'package:spotify_with_flutter/data/sources/auth/auth_api_service.dart';
-import 'package:spotify_with_flutter/data/sources/song/song_api_service.dart';
-import 'package:spotify_with_flutter/data/sources/upload/upload_api_service.dart';
-import 'package:spotify_with_flutter/domain/repository/auth/auth.dart';
-import 'package:spotify_with_flutter/domain/repository/song/song.dart';
-import 'package:spotify_with_flutter/domain/usecase/auth/get_user.dart';
-import 'package:spotify_with_flutter/domain/usecase/auth/signin.dart';
-import 'package:spotify_with_flutter/domain/usecase/auth/signup.dart';
-import 'package:spotify_with_flutter/domain/usecase/song/add_or_remove_favorite_song.dart';
-import 'package:spotify_with_flutter/domain/usecase/song/get_favorite_songs.dart';
-import 'package:spotify_with_flutter/domain/usecase/song/get_news_songs.dart';
-import 'package:spotify_with_flutter/domain/usecase/song/get_play_list.dart';
-import 'package:spotify_with_flutter/domain/usecase/song/is_favorite_song.dart';
+import 'package:sage/data/repository/auth/auth_repository_impl.dart';
+import 'package:sage/data/repository/lecture/lecture_repository_impl.dart';
+import 'package:sage/data/sources/auth/auth_api_service.dart';
+import 'package:sage/data/sources/lecture/lecture_api_service.dart';
+import 'package:sage/data/sources/upload/upload_api_service.dart';
+import 'package:sage/domain/repository/auth/auth.dart';
+import 'package:sage/domain/repository/lecture/lecture.dart';
+import 'package:sage/domain/usecase/auth/get_user.dart';
+import 'package:sage/domain/usecase/auth/signin.dart';
+import 'package:sage/domain/usecase/auth/signup.dart';
+import 'package:sage/domain/usecase/lecture/toggle_saved_lecture.dart';
+import 'package:sage/domain/usecase/lecture/get_saved_lectures.dart';
+import 'package:sage/domain/usecase/lecture/get_recent_lectures.dart';
+import 'package:sage/domain/usecase/lecture/get_lecture_library.dart';
+import 'package:sage/domain/usecase/lecture/is_saved_lecture.dart';
 
 final sl = GetIt.instance;
 
@@ -37,8 +37,8 @@ Future<void> initializeDependencies() async {
     ),
   );
 
-  sl.registerSingleton<SongApiService>(
-    SongApiServiceImpl(
+  sl.registerSingleton<LectureApiService>(
+    LectureApiServiceImpl(
       client: sl<http.Client>(),
       preferences: sl<SharedPreferences>(),
     ),
@@ -55,8 +55,8 @@ Future<void> initializeDependencies() async {
     AuthRepositoryImpl(),
   );
 
-  sl.registerSingleton<SongsRepository>(
-    SongRepositoryImpl(),
+  sl.registerSingleton<LectureRepository>(
+    LectureRepositoryImpl(),
   );
 
   sl.registerSingleton<SignupUseCase>(
@@ -71,23 +71,23 @@ Future<void> initializeDependencies() async {
     GetUserUseCase(),
   );
 
-  sl.registerSingleton<GetNewsSongsUseCase>(
-    GetNewsSongsUseCase(),
+  sl.registerSingleton<GetRecentLecturesUseCase>(
+    GetRecentLecturesUseCase(),
   );
 
-  sl.registerSingleton<GetPlayListUseCase>(
-    GetPlayListUseCase(),
+  sl.registerSingleton<GetLectureLibraryUseCase>(
+    GetLectureLibraryUseCase(),
   );
 
-  sl.registerSingleton<AddOrRemoveFavoriteSongUseCase>(
-    AddOrRemoveFavoriteSongUseCase(),
+  sl.registerSingleton<ToggleSavedLectureUseCase>(
+    ToggleSavedLectureUseCase(),
   );
 
-  sl.registerSingleton<IsFavoriteSongUseCase>(
-    IsFavoriteSongUseCase(),
+  sl.registerSingleton<IsSavedLectureUseCase>(
+    IsSavedLectureUseCase(),
   );
 
-  sl.registerSingleton<GetFavoriteSongsUseCase>(
-    GetFavoriteSongsUseCase(),
+  sl.registerSingleton<GetSavedLecturesUseCase>(
+    GetSavedLecturesUseCase(),
   );
 }

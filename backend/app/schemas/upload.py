@@ -30,3 +30,12 @@ class UploadListItemResponse(BaseModel):
     document_status: str
     selected_voice: str
     lecture_id: str | None = None
+
+
+class UploadLimitsResponse(BaseModel):
+    daily_new_lecture_limit: int
+    new_lectures_used_today: int
+    new_lectures_remaining_today: int
+    daily_regeneration_limit: int
+    regenerations_used_today: int
+    regenerations_remaining_today: int

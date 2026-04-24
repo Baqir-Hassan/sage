@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:spotify_with_flutter/common/widgets/appbar/app_bar.dart';
-import 'package:spotify_with_flutter/common/widgets/button/basic_app_button.dart';
-import 'package:spotify_with_flutter/common/helpers/is_dark_mode.dart';
-import 'package:spotify_with_flutter/core/configs/assets/app_images.dart';
-import 'package:spotify_with_flutter/core/configs/assets/app_vectors.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/presentation/auth/pages/signup.dart';
-import 'package:spotify_with_flutter/presentation/auth/pages/singin.dart';
+import 'package:sage/common/widgets/appbar/app_bar.dart';
+import 'package:sage/common/widgets/button/basic_app_button.dart';
+import 'package:sage/common/helpers/is_dark_mode.dart';
+import 'package:sage/core/configs/assets/app_images.dart';
+import 'package:sage/core/configs/assets/app_vectors.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/presentation/auth/pages/signup.dart';
+import 'package:sage/presentation/auth/pages/singin.dart';
 
 class SignupOrSignin extends StatelessWidget {
   const SignupOrSignin({super.key});
@@ -28,7 +28,6 @@ class SignupOrSignin extends StatelessWidget {
           ),
           Align(
             alignment: Alignment.bottomLeft,
-            child: Image.asset(AppImages.chooseAuthBG),
           ),
           Align(
             alignment: Alignment.center,
@@ -55,7 +54,7 @@ class SignupOrSignin extends StatelessWidget {
                     height: 20,
                   ),
                   Text(
-                    'Create an account to upload notes, generate spoken lectures, and organize every subject into smart playlists.',
+                    'Create an account to upload notes, generate spoken lectures, and organize every subject into study collections.',
                     style: TextStyle(
                       fontWeight: FontWeight.w400,
                       color: context.isDarkMode

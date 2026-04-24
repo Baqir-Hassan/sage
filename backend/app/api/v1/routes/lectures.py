@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,10 +9,14 @@ from app.db.session import get_db
 from app.models.audio_track import AudioTrack
 from app.models.lecture import Lecture
 from app.models.lecture_section import LectureSection
+from app.models.processing_job import ProcessingJob
 from app.models.user import User
 from app.schemas.lecture import LectureResponse, LectureTrackResponse, VoiceUpdateRequest
+from app.services.lecture_summary_service import build_lecture_summary_map
 from app.services.processing_service import ProcessingService
+from app.services.queue_service import get_queue_service
 from app.services.storage_service import get_storage_service
+from app.services.usage_limit_service import DailyLimitExceededError, UsageLimitService
 
 
 router = APIRouter()
@@ -26,7 +32,13 @@ def list_lectures(
         .where(Lecture.owner_user_id == current_user.id)
         .order_by(Lecture.created_at.desc())
     ).all()
-    return [LectureResponse.model_validate(lecture) for lecture in lectures]
+    summaries = build_lecture_summary_map(db, [lecture.id for lecture in lectures])
+    return [
+        LectureResponse.model_validate(lecture).model_copy(
+            update=summaries.get(lecture.id, {})
+        )
+        for lecture in lectures
+    ]
 
 
 @router.get("/{lecture_id}", response_model=LectureResponse)
@@ -40,7 +52,8 @@ def get_lecture(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lecture not found.")
     if lecture.owner_user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
-    return LectureResponse.model_validate(lecture)
+    summary = build_lecture_summary_map(db, [lecture.id]).get(lecture.id, {})
+    return LectureResponse.model_validate(lecture).model_copy(update=summary)
 
 
 @router.patch("/{lecture_id}/voice", response_model=LectureResponse)
@@ -116,10 +129,23 @@ def generate_audio_for_lecture(
     if lecture.owner_user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
 
-    updated_lecture = ProcessingService(db).generate_audio_for_lecture(lecture_id)
-    if not updated_lecture:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lecture not found.")
-    return LectureResponse.model_validate(updated_lecture)
+    lecture.status = "audio_queued"
+    job = _create_processing_job(
+        db,
+        document_id=lecture.document_id,
+        job_type="lecture_audio_generation",
+    )
+    db.add(lecture)
+    db.commit()
+    db.refresh(lecture)
+
+    get_queue_service().enqueue_lecture_audio_generation(
+        lecture_id=lecture.id,
+        processing_job_id=job.id,
+        document_id=lecture.document_id,
+    )
+    summary = build_lecture_summary_map(db, [lecture.id]).get(lecture.id, {})
+    return LectureResponse.model_validate(lecture).model_copy(update=summary)
 
 
 @router.post("/{lecture_id}/regenerate-content", response_model=LectureResponse)
@@ -134,10 +160,28 @@ def regenerate_lecture_content(
     if lecture.owner_user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
 
-    updated_lecture = ProcessingService(db).regenerate_lecture_content(lecture_id)
-    if not updated_lecture:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lecture not found.")
-    return LectureResponse.model_validate(updated_lecture)
+    try:
+        UsageLimitService(db).enforce_regeneration_limit(current_user.id)
+    except DailyLimitExceededError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.detail) from exc
+
+    lecture.status = "content_queued"
+    job = _create_processing_job(
+        db,
+        document_id=lecture.document_id,
+        job_type="lecture_content_regeneration",
+    )
+    db.add(lecture)
+    db.commit()
+    db.refresh(lecture)
+
+    get_queue_service().enqueue_lecture_regeneration(
+        lecture_id=lecture.id,
+        processing_job_id=job.id,
+        document_id=lecture.document_id,
+    )
+    summary = build_lecture_summary_map(db, [lecture.id]).get(lecture.id, {})
+    return LectureResponse.model_validate(lecture).model_copy(update=summary)
 
 
 @router.delete("/{lecture_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -157,3 +201,14 @@ def delete_lecture(
         db.delete(playlist_link)
     db.delete(lecture)
     db.commit()
+
+
+def _create_processing_job(db: Session, document_id: str, job_type: str) -> ProcessingJob:
+    job = ProcessingJob(
+        id=str(uuid4()),
+        document_id=document_id,
+        job_type=job_type,
+        status="queued",
+    )
+    db.add(job)
+    return job

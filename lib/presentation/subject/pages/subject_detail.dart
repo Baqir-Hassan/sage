@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:spotify_with_flutter/common/widgets/appbar/app_bar.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/data/sources/song/song_api_service.dart';
-import 'package:spotify_with_flutter/domain/entities/songs/songs.dart';
-import 'package:spotify_with_flutter/presentation/lecture/pages/lecture_detail.dart';
-import 'package:spotify_with_flutter/service_locator.dart';
+import 'package:sage/common/widgets/appbar/app_bar.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/data/sources/lecture/lecture_api_service.dart';
+import 'package:sage/domain/entities/lectures/lecture.dart';
+import 'package:sage/presentation/lecture/pages/lecture_detail.dart';
+import 'package:sage/service_locator.dart';
 
 class SubjectDetailPage extends StatefulWidget {
   final String subjectId;
@@ -25,7 +25,7 @@ class SubjectDetailPage extends StatefulWidget {
 class _SubjectDetailPageState extends State<SubjectDetailPage> {
   bool _isLoading = true;
   String? _errorMessage;
-  List<SongEntity> _lectures = const [];
+  List<LectureEntity> _lectures = const [];
 
   @override
   void initState() {
@@ -153,7 +153,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
     );
   }
 
-  Widget _lectureTile(SongEntity lecture) {
+  Widget _lectureTile(LectureEntity lecture) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
@@ -186,7 +186,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(
-            lecture.artist,
+            lecture.summary,
             maxLines: 2,
             overflow: TextOverflow.fade,
             style: const TextStyle(
@@ -219,7 +219,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
       _errorMessage = null;
     });
 
-    final result = await sl<SongApiService>().getSubjectLectures(widget.subjectId);
+    final result = await sl<LectureApiService>().getSubjectLectures(widget.subjectId);
 
     if (!mounted) return;
 
@@ -233,7 +233,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
       (data) {
         setState(() {
           _isLoading = false;
-          _lectures = (data as List<dynamic>).cast<SongEntity>();
+          _lectures = (data as List<dynamic>).cast<LectureEntity>();
         });
       },
     );

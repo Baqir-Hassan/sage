@@ -107,6 +107,9 @@ class ProcessingService:
         if not document:
             return None
 
+        lecture.status = "content_processing"
+        self.db.commit()
+
         extracted_text = self._extract_text_for_document(document)
         lecture_payload = self.llm.generate_lecture_script(
             prompt=self._build_prompt(document.original_filename, extracted_text)

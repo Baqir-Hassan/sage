@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/data/sources/song/song_api_service.dart';
-import 'package:spotify_with_flutter/data/sources/upload/upload_api_service.dart';
-import 'package:spotify_with_flutter/service_locator.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/data/sources/lecture/lecture_api_service.dart';
+import 'package:sage/data/sources/upload/upload_api_service.dart';
+import 'package:sage/service_locator.dart';
 
 class UploadsTab extends StatefulWidget {
   const UploadsTab({super.key});
@@ -60,7 +60,7 @@ class _UploadsTabState extends State<UploadsTab> {
   }
 
   Future<void> _deleteLecture(String lectureId) async {
-    final result = await sl<SongApiService>().deleteLecture(lectureId);
+    final result = await sl<LectureApiService>().deleteLecture(lectureId);
     if (!mounted) return;
     result.fold(
       (failure) => _showSnack(failure.toString()),

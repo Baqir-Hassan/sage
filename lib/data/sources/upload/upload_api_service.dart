@@ -4,14 +4,16 @@ import 'package:dartz/dartz.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:spotify_with_flutter/core/constants/api_urls.dart';
+import 'package:sage/core/constants/api_urls.dart';
 
 abstract class UploadApiService {
   Future<Either> uploadDocument({
     required PlatformFile file,
     required String voiceOption,
     String? subjectId,
+    String? subjectName,
   });
+  Future<Either> getUploadLimits();
   Future<Either> listUploads();
   Future<Either> getUploadStatus(String documentId);
   Future<Either> deleteUpload(String documentId);
@@ -34,6 +36,7 @@ class UploadApiServiceImpl extends UploadApiService {
     required PlatformFile file,
     required String voiceOption,
     String? subjectId,
+    String? subjectName,
   }) async {
     try {
       final token = _preferences.getString(_tokenKey);
@@ -53,6 +56,9 @@ class UploadApiServiceImpl extends UploadApiService {
       if (subjectId != null && subjectId.trim().isNotEmpty) {
         request.fields['subject_id'] = subjectId.trim();
       }
+      if (subjectName != null && subjectName.trim().isNotEmpty) {
+        request.fields['subject_name'] = subjectName.trim();
+      }
 
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -71,6 +77,33 @@ class UploadApiServiceImpl extends UploadApiService {
       }
 
       return Left(_extractError(body, fallback: 'Unable to upload document.'));
+    } catch (_) {
+      return const Left('Unable to connect to the backend.');
+    }
+  }
+
+  @override
+  Future<Either> getUploadLimits() async {
+    try {
+      final token = _preferences.getString(_tokenKey);
+      if (token == null || token.isEmpty) {
+        return const Left('Please sign in before viewing usage limits.');
+      }
+
+      final response = await _client.get(
+        Uri.parse(ApiUrls.uploadLimits),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final body = _decodeResponse(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return Right(body);
+      }
+
+      return Left(_extractError(body, fallback: 'Unable to load usage limits.'));
     } catch (_) {
       return const Left('Unable to connect to the backend.');
     }

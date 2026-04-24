@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:spotify_with_flutter/common/widgets/appbar/app_bar.dart';
-import 'package:spotify_with_flutter/common/widgets/button/basic_app_button.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/data/sources/song/song_api_service.dart';
-import 'package:spotify_with_flutter/data/sources/upload/upload_api_service.dart';
-import 'package:spotify_with_flutter/domain/entities/songs/songs.dart';
-import 'package:spotify_with_flutter/presentation/lecture/pages/lecture_detail.dart';
-import 'package:spotify_with_flutter/service_locator.dart';
+import 'package:sage/common/widgets/appbar/app_bar.dart';
+import 'package:sage/common/widgets/button/basic_app_button.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/data/sources/lecture/lecture_api_service.dart';
+import 'package:sage/data/sources/upload/upload_api_service.dart';
+import 'package:sage/domain/entities/lectures/lecture.dart';
+import 'package:sage/presentation/lecture/pages/lecture_detail.dart';
+import 'package:sage/service_locator.dart';
 
 class UploadProcessingPage extends StatefulWidget {
   final String documentId;
@@ -43,13 +43,10 @@ class _UploadProcessingPageState extends State<UploadProcessingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final processingStatus =
-        (_statusData?['processing_status'] as String?) ?? 'queued';
-    final documentStatus =
-        (_statusData?['document_status'] as String?) ?? 'uploaded';
+    final processingStatus = (_statusData?['processing_status'] as String?) ?? 'queued';
+    final documentStatus = (_statusData?['document_status'] as String?) ?? 'uploaded';
     final lectureId = _statusData?['lecture_id'] as String?;
-    final isReady =
-        processingStatus == 'completed' && documentStatus == 'completed' && lectureId != null;
+    final isReady = processingStatus == 'completed' && documentStatus == 'ready' && lectureId != null;
 
     return Scaffold(
       appBar: const BasicAppBar(
@@ -173,7 +170,7 @@ class _UploadProcessingPageState extends State<UploadProcessingPage> {
       (data) {
         final status = data as Map<String, dynamic>;
         final isComplete = status['processing_status'] == 'completed' &&
-            status['document_status'] == 'completed' &&
+            status['document_status'] == 'ready' &&
             status['lecture_id'] != null;
 
         setState(() {
@@ -205,30 +202,21 @@ class _UploadProcessingPageState extends State<UploadProcessingPage> {
       _isOpeningLecture = true;
     });
 
-    final lecturesResult = await sl<SongApiService>().getPlayList();
+    final lectureResult = await sl<LectureApiService>().getLecture(lectureId);
 
     if (!mounted) return;
 
-    lecturesResult.fold(
+    lectureResult.fold(
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(failure.toString())),
         );
       },
-      (items) {
-        final lectures = (items as List<SongEntity>);
-        final match = lectures.where((lecture) => lecture.songId == lectureId);
-        if (match.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Lecture is ready but could not be opened yet.')),
-          );
-          return;
-        }
-
+      (lecture) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => LectureDetailPage(lecture: match.first),
+            builder: (_) => LectureDetailPage(lecture: lecture as LectureEntity),
           ),
         );
       },

@@ -1,60 +1,56 @@
-# AWS Deployment Guide
+# AWS Free-Tier Launch Guide
 
-This backend now supports two storage modes:
+This guide is focused on the cheapest practical AWS launch path for Sage.
 
-- `local`: SQLite + local filesystem
-- `s3`: PostgreSQL + S3
+## Recommended Starter Architecture
 
-## Step 1: Create these AWS resources
+Use these AWS services first:
 
-Create:
+- `EC2` for the FastAPI API and the background worker on the same instance
+- `S3` for uploaded notes and generated audio
+- `SQS` for background document processing jobs
+- `RDS PostgreSQL` if it fits your free-tier/credits, otherwise keep the database on the EC2 instance for the earliest launch
 
-1. `Amazon RDS PostgreSQL`
-2. `Amazon S3`
-3. `Amazon ECR`
-4. `Amazon ECS Fargate`
-5. `Application Load Balancer`
+Avoid at the start:
 
-Add later:
-
-- `ElastiCache Redis`
+- `ECS Fargate`
+- `ElastiCache`
+- `Step Functions`
 - `CloudFront`
 - `Secrets Manager`
 
-## Step 2: Create S3 buckets
+Those are useful later, but they increase cost and operational complexity too early.
 
-Create three private buckets in the same region:
+## Step 1: Create AWS resources
+
+Create:
+
+1. one `EC2` instance
+2. one `SQS` queue for document processing
+3. one dead-letter queue for failed jobs
+4. three private `S3` buckets, or one private bucket with prefixes
+5. optionally one `RDS PostgreSQL` database
+
+Recommended bucket names:
 
 - `sage-ai-raw`
 - `sage-ai-audio`
 - `sage-ai-artifacts`
 
-## Step 3: Create PostgreSQL on RDS
+## Step 2: Configure environment variables
 
-Collect:
-
-- DB host
-- port
-- database name
-- username
-- password
-
-Use a connection string like:
-
-```env
-DATABASE_URL=postgresql+psycopg://USERNAME:PASSWORD@HOST:5432/DBNAME
-```
-
-## Step 4: Production env vars
-
-Set these in ECS:
+Set these in production:
 
 ```env
 APP_ENV=production
 DEBUG=false
 SECRET_KEY=replace-with-a-strong-random-secret
 DATABASE_URL=postgresql+psycopg://USERNAME:PASSWORD@HOST:5432/DBNAME
-REDIS_URL=redis://localhost:6379/0
+QUEUE_PROVIDER=sqs
+SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/sage-document-processing
+SQS_REGION=us-east-1
+SQS_WAIT_TIME_SECONDS=20
+SQS_MAX_MESSAGES=1
 STORAGE_PROVIDER=s3
 AWS_REGION=us-east-1
 S3_BUCKET_RAW=sage-ai-raw
@@ -69,48 +65,122 @@ DEFAULT_MALE_VOICE=en-US-AndrewNeural
 DEFAULT_FEMALE_VOICE=en-US-JennyNeural
 ```
 
-If you run on ECS, use a task role for S3 instead of hardcoding AWS credentials.
+A production-ready example file is available at [`.env.production.example`](./.env.production.example).
 
-## Step 5: ECS task role permissions
+If you are launching as cheaply as possible, you can temporarily keep a local database on EC2 and use:
 
-Grant the ECS task role:
+```env
+DATABASE_URL=sqlite:///./app.db
+```
 
-- `s3:GetObject`
-- `s3:PutObject`
-- `s3:DeleteObject`
+That is acceptable for a first low-traffic launch, but PostgreSQL should be the next upgrade.
 
-for those three buckets.
+## Step 3: Attach IAM permissions
 
-## Step 6: Build the image
+Give the EC2 instance role permission to:
+
+- send and receive SQS messages
+- delete SQS messages
+- read and write S3 objects
+- delete S3 objects
+
+This is better than hardcoding AWS credentials into `.env`.
+
+## Step 4: Deploy the API
+
+From the repository root:
 
 ```powershell
 docker build -t sage-ai-backend ./backend
 ```
 
-Push it to ECR and use that image in ECS.
+You can deploy with Docker on EC2 or install Python directly on the instance.
 
-## Step 7: ECS service
+Before starting the API for the first time, run:
 
-Recommended:
+```powershell
+./scripts/run_migrations.sh
+```
 
-- one ECS service for API
-- container port `8000`
-- one ALB forwarding `80/443` to `8000`
+Run the API with:
 
-## Step 8: First test after deploy
+```powershell
+./scripts/start_api.sh
+```
 
-1. Open `/health`
-2. Open `/docs`
-3. Create a user
-4. Upload a PDF or PPTX
-5. Confirm the original file lands in `sage-ai-raw`
-6. Confirm generated MP3s land in `sage-ai-audio`
+## Step 5: Deploy the worker
 
-## Step 9: Next production steps
+Run the worker on the same EC2 instance:
 
-After the first deploy works:
+```powershell
+./scripts/start_sqs_worker.sh
+```
 
-1. add Alembic migrations
-2. replace local/background tasks with Celery workers
-3. move secrets into Secrets Manager
-4. put CloudFront in front of audio delivery
+The API writes jobs to SQS, and this worker consumes them.
+
+Currently queued operations include:
+
+- document ingestion after upload
+- lecture audio generation
+- lecture content regeneration
+
+Launch safeguards currently include:
+
+- `5` new lecture uploads per account per UTC day
+- `5` lecture regenerations per account per UTC day
+
+For a step-by-step instance setup checklist, see [EC2_CHECKLIST.md](./EC2_CHECKLIST.md).
+`systemd` unit templates are available in [deploy/systemd](./deploy/systemd).
+An Nginx reverse-proxy template is available in [deploy/nginx](./deploy/nginx).
+
+## Step 6: Reverse proxy and domain
+
+Use `Nginx` in front of the API and point your domain or subdomain to the EC2 public endpoint.
+
+Suggested split:
+
+- `api.yourdomain.com` -> FastAPI
+- Flutter app/web client points `API_BASE_URL` to that backend URL
+
+For HTTPS, the simplest starter path is Nginx + Certbot on the EC2 instance after DNS is pointing correctly.
+
+## Step 7: First deployment test
+
+Verify these in order:
+
+1. open `/health`
+2. open `/ready` and confirm all components are marked ready
+3. open `/docs`
+4. create a user
+5. upload a `PDF` or `PPTX`
+6. confirm an SQS message is created
+7. confirm the worker consumes the message
+8. confirm the original file lands in `S3_BUCKET_RAW`
+9. confirm generated audio lands in `S3_BUCKET_AUDIO`
+10. confirm the lecture appears in the app
+
+## Step 8: Cost-aware upgrades later
+
+Move to these only after traction:
+
+1. `RDS PostgreSQL` if you launched with SQLite on EC2
+2. `CloudFront` for audio delivery
+3. `ECS` or `Fargate` for separate API and worker services
+4. `Step Functions` for multi-stage orchestration and richer progress tracking
+5. `Secrets Manager` or Parameter Store for secret management
+
+If you are planning the SQLite -> PostgreSQL cutover, see [POSTGRESQL_MIGRATION.md](./POSTGRESQL_MIGRATION.md).
+
+## Current Queue Modes
+
+The backend now supports:
+
+- `QUEUE_PROVIDER=celery`
+- `QUEUE_PROVIDER=sqs`
+- `QUEUE_PROVIDER=sync`
+
+Recommended usage:
+
+- local development with existing worker setup: `celery`
+- local debugging without queue infra: `sync`
+- AWS launch path: `sqs`

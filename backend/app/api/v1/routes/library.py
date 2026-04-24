@@ -8,6 +8,7 @@ from app.models.lecture import Lecture
 from app.models.playlist import Playlist
 from app.models.user import User
 from app.schemas.library import HomeLectureItem, HomePlaylistItem, LibraryHomeResponse
+from app.services.lecture_summary_service import build_lecture_summary_map
 
 
 router = APIRouter()
@@ -30,7 +31,13 @@ def get_library_home(
         .order_by(Playlist.created_at.desc())
         .limit(12)
     ).all()
+    summaries = build_lecture_summary_map(db, [lecture.id for lecture in lectures])
     return LibraryHomeResponse(
-        recent_lectures=[HomeLectureItem.model_validate(lecture) for lecture in lectures],
+        recent_lectures=[
+            HomeLectureItem.model_validate(lecture).model_copy(
+                update=summaries.get(lecture.id, {})
+            )
+            for lecture in lectures
+        ],
         playlists=[HomePlaylistItem.model_validate(playlist) for playlist in playlists],
     )

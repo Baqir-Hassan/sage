@@ -1,4 +1,4 @@
-import 'package:spotify_with_flutter/domain/entities/auth/user.dart';
+import 'package:sage/domain/entities/auth/user.dart';
 
 abstract class ProfileInfoState {}
 

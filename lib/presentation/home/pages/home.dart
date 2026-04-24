@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:spotify_with_flutter/common/helpers/is_dark_mode.dart';
-import 'package:spotify_with_flutter/core/configs/assets/app_images.dart';
-import 'package:spotify_with_flutter/core/configs/assets/app_vectors.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/presentation/home/widgets/news_songs.dart';
-import 'package:spotify_with_flutter/presentation/home/widgets/play_list.dart';
-import 'package:spotify_with_flutter/presentation/home/widgets/subjects_tab.dart';
-import 'package:spotify_with_flutter/presentation/home/widgets/uploads_tab.dart';
-import 'package:spotify_with_flutter/presentation/profile/page/profile.dart';
-import 'package:spotify_with_flutter/presentation/upload/pages/upload_notes.dart';
+import 'package:sage/common/helpers/is_dark_mode.dart';
+import 'package:sage/core/configs/assets/app_images.dart';
+import 'package:sage/core/configs/assets/app_vectors.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/presentation/home/widgets/recent_lectures.dart';
+import 'package:sage/presentation/home/widgets/lecture_library.dart';
+import 'package:sage/presentation/home/widgets/subjects_tab.dart';
+import 'package:sage/presentation/home/widgets/uploads_tab.dart';
+import 'package:sage/presentation/profile/page/profile.dart';
+import 'package:sage/presentation/upload/pages/upload_notes.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -30,7 +30,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _appBarArtist(context),
+      appBar: _appBar(context),
       body: SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -44,22 +44,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  const NewsSongs(),
+                  const RecentLectures(),
                   const SubjectsTab(),
                   const UploadsTab(),
-                  const PlayList(),
+                  const LectureLibrary(),
                 ],
               ),
             ),
             const SizedBox(height: 25),
-            const PlayList(),
+            const LectureLibrary(),
           ],
         ),
       ),
     );
   }
 
-  AppBar _appBarArtist(BuildContext context) {
+  AppBar _appBar(BuildContext context) {
     return AppBar(
       title: SvgPicture.asset(
         AppVectors.logo,
@@ -151,7 +151,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               ),
                             ),
                             Text(
-                              'Freshly generated lecture series',
+                              'Recently generated lecture collection',
                               style: TextStyle(
                                 color: AppColors.white,
                                 fontWeight: FontWeight.w400,
@@ -168,14 +168,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
               Positioned(
                 right: 0,
-                child: SvgPicture.asset(AppVectors.unionHomeArtistTop),
+                child: SvgPicture.asset(AppVectors.unionHomeTop),
               ),
               Align(
                 alignment: Alignment.bottomRight,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 15),
                   child: Image.asset(
-                    AppImages.homeArtist,
+                    AppImages.homeArtwork,
                   ),
                 ),
               ),
@@ -216,7 +216,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ),
           Text(
-            'Saved',
+            'Library',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,

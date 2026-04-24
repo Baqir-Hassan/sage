@@ -64,6 +64,27 @@ class LocalStorageService:
         relative_path = storage_path.relative_to(self.base_path)
         return f"/media/{relative_path.as_posix()}"
 
+    def check_connection(self) -> dict[str, object]:
+        try:
+            self.base_path.mkdir(parents=True, exist_ok=True)
+            probe_dir = self.base_path / "healthcheck"
+            probe_dir.mkdir(parents=True, exist_ok=True)
+            probe_file = probe_dir / ".write_test"
+            probe_file.write_text("ok", encoding="utf-8")
+            probe_file.unlink(missing_ok=True)
+            return {
+                "provider": "local",
+                "ready": True,
+                "base_path": str(self.base_path),
+            }
+        except Exception as exc:
+            return {
+                "provider": "local",
+                "ready": False,
+                "base_path": str(self.base_path),
+                "detail": str(exc),
+            }
+
 
 class S3StorageService:
     def __init__(self) -> None:
@@ -125,6 +146,39 @@ class S3StorageService:
             Params={"Bucket": bucket, "Key": key},
             ExpiresIn=self.settings.s3_presign_expiry_seconds,
         )
+
+    def check_connection(self) -> dict[str, object]:
+        bucket_status: dict[str, str] = {}
+        try:
+            buckets = {
+                "raw": self.settings.s3_bucket_raw,
+                "audio": self.settings.s3_bucket_audio,
+                "artifacts": self.settings.s3_bucket_artifacts,
+            }
+            missing = [name for name, bucket in buckets.items() if not bucket]
+            if missing:
+                return {
+                    "provider": "s3",
+                    "ready": False,
+                    "detail": f"Missing S3 bucket configuration: {', '.join(missing)}",
+                }
+
+            for name, bucket in buckets.items():
+                self.client.head_bucket(Bucket=bucket)
+                bucket_status[name] = bucket
+
+            return {
+                "provider": "s3",
+                "ready": True,
+                "buckets": bucket_status,
+            }
+        except Exception as exc:
+            return {
+                "provider": "s3",
+                "ready": False,
+                "buckets": bucket_status,
+                "detail": str(exc),
+            }
 
     def _build_s3_uri(self, bucket: str, key: str) -> str:
         return f"s3://{bucket}/{key}"

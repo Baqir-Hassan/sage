@@ -1,6 +1,8 @@
+from pathlib import Path
+import re
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -9,36 +11,80 @@ from app.db.session import get_db
 from app.models.document import Document
 from app.models.lecture import Lecture
 from app.models.processing_job import ProcessingJob
+from app.models.subject import Subject
 from app.models.user import User
-from app.schemas.upload import UploadListItemResponse, UploadResponse, UploadStatusResponse, VoiceOption
+from app.schemas.upload import (
+    UploadLimitsResponse,
+    UploadListItemResponse,
+    UploadResponse,
+    UploadStatusResponse,
+    VoiceOption,
+)
 from app.services.processing_service import ProcessingService
+from app.services.queue_service import get_queue_service
 from app.services.storage_service import get_storage_service
+from app.services.usage_limit_service import DailyLimitExceededError, UsageLimitService
 
 
 router = APIRouter()
 
+ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".pptx"}
+ALLOWED_UPLOAD_CONTENT_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
+
+
+@router.get("/limits", response_model=UploadLimitsResponse)
+def get_upload_limits(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UploadLimitsResponse:
+    summary = UsageLimitService(db).build_usage_summary(current_user.id)
+    return UploadLimitsResponse(**summary)
+
 
 @router.post("", response_model=UploadResponse, status_code=status.HTTP_202_ACCEPTED)
 async def upload_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     voice_option: VoiceOption = Form(...),
     subject_id: str | None = Form(default=None),
+    subject_name: str | None = Form(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UploadResponse:
+    try:
+        UsageLimitService(db).enforce_new_lecture_limit(current_user.id)
+    except DailyLimitExceededError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.detail) from exc
+
+    filename = file.filename or "upload"
+    extension = Path(filename).suffix.lower()
+    content_type = file.content_type or "application/octet-stream"
+    if extension not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF and PPTX files are supported.",
+        )
+    if content_type != "application/octet-stream" and content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF and PPTX files are supported.",
+        )
+
     storage = get_storage_service()
     file_bytes = await file.read()
-    storage_key = storage.save_upload(file.filename or "upload", file_bytes)
+    storage_key = storage.save_upload(filename, file_bytes)
+    resolved_subject_id = _resolve_subject_selection(db, subject_id, subject_name)
 
     document = Document(
         id=str(uuid4()),
         user_id=current_user.id,
-        original_filename=file.filename or "upload",
-        content_type=file.content_type or "application/octet-stream",
+        original_filename=filename,
+        content_type=content_type,
         storage_key=storage_key,
         status="uploaded",
-        subject_id=subject_id,
+        subject_id=resolved_subject_id,
         selected_voice=voice_option.value,
     )
     db.add(document)
@@ -52,7 +98,7 @@ async def upload_document(
     db.add(job)
     db.commit()
 
-    background_tasks.add_task(run_processing_job, document.id)
+    get_queue_service().enqueue_document_processing(document.id)
 
     return UploadResponse(
         document_id=document.id,
@@ -162,11 +208,28 @@ def delete_upload(
     db.commit()
 
 
-def run_processing_job(document_id: str) -> None:
-    from app.db.session import SessionLocal
+def _resolve_subject_selection(db: Session, subject_id: str | None, subject_name: str | None) -> str | None:
+    normalized_subject_name = (subject_name or "").strip()
+    if normalized_subject_name:
+        base_slug = _slugify_subject_name(normalized_subject_name)
+        candidate_slug = base_slug
+        suffix = 2
 
-    db = SessionLocal()
-    try:
-        ProcessingService(db).process_document(document_id)
-    finally:
-        db.close()
+        while True:
+            existing = db.scalar(select(Subject).where(Subject.slug == candidate_slug))
+            if existing is None:
+                subject = Subject(name=normalized_subject_name, slug=candidate_slug)
+                db.add(subject)
+                db.flush()
+                return subject.id
+            if existing.name.lower() == normalized_subject_name.lower():
+                return existing.id
+            candidate_slug = f"{base_slug}-{suffix}"
+            suffix += 1
+
+    return subject_id or None
+
+
+def _slugify_subject_name(subject_name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", subject_name.lower()).strip("-")
+    return slug or "general"

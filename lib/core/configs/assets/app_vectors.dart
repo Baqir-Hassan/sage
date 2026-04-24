@@ -7,5 +7,5 @@ class AppVectors {
   static const String moon = '${basePath}moon$format';
   static const String unionTop = '${basePath}union_top$format';
   static const String unionBottom = '${basePath}union_bottom$format';
-  static const String unionHomeArtistTop = '${basePath}union_home_top$format';
+  static const String unionHomeTop = '${basePath}union_home_top$format';
 }

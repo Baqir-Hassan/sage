@@ -10,6 +10,7 @@ from app.models.subject import Subject
 from app.models.user import User
 from app.schemas.lecture import LectureResponse
 from app.schemas.subject import SubjectResponse
+from app.services.lecture_summary_service import build_lecture_summary_map
 
 
 router = APIRouter()
@@ -65,4 +66,10 @@ def list_subject_lectures(
         .where(Lecture.owner_user_id == current_user.id)
         .order_by(Lecture.created_at.desc())
     ).all()
-    return [LectureResponse.model_validate(lecture) for lecture in lectures]
+    summaries = build_lecture_summary_map(db, [lecture.id for lecture in lectures])
+    return [
+        LectureResponse.model_validate(lecture).model_copy(
+            update=summaries.get(lecture.id, {})
+        )
+        for lecture in lectures
+    ]

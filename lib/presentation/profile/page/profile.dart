@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:spotify_with_flutter/common/helpers/is_dark_mode.dart';
-import 'package:spotify_with_flutter/common/widgets/appbar/app_bar.dart';
-import 'package:spotify_with_flutter/common/widgets/favorite_button/favorite_button.dart';
-import 'package:spotify_with_flutter/core/configs/assets/app_images.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/domain/entities/songs/songs.dart';
-import 'package:spotify_with_flutter/presentation/profile/bloc/favofite_songs_cubit.dart';
-import 'package:spotify_with_flutter/presentation/profile/bloc/favorite_songs_state.dart';
-import 'package:spotify_with_flutter/presentation/profile/bloc/profile_info_cubit.dart';
-import 'package:spotify_with_flutter/presentation/profile/bloc/profile_info_state.dart';
-import 'package:spotify_with_flutter/presentation/song_player.dart/pages/song_player.dart';
+import 'package:sage/common/helpers/is_dark_mode.dart';
+import 'package:sage/common/widgets/appbar/app_bar.dart';
+import 'package:sage/common/widgets/saved_lecture_button/saved_lecture_button.dart';
+import 'package:sage/core/configs/assets/app_images.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/domain/entities/lectures/lecture.dart';
+import 'package:sage/presentation/profile/bloc/saved_lectures_cubit.dart';
+import 'package:sage/presentation/profile/bloc/saved_lectures_state.dart';
+import 'package:sage/presentation/profile/bloc/profile_info_cubit.dart';
+import 'package:sage/presentation/profile/bloc/profile_info_state.dart';
+import 'package:sage/presentation/lecture_player/pages/lecture_player.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -27,7 +27,7 @@ class ProfilePage extends StatelessWidget {
         children: [
           _profileInfo(context),
           const SizedBox(height: 30),
-          _favoriteSongs(),
+          _savedLectures(),
         ],
       ),
     );
@@ -100,9 +100,9 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _favoriteSongs() {
+  Widget _savedLectures() {
     return BlocProvider(
-      create: (context) => FavoriteSongsCubit()..getFavoriteSongs(),
+      create: (context) => SavedLecturesCubit()..getSavedLectures(),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
@@ -110,13 +110,13 @@ class ProfilePage extends StatelessWidget {
           children: [
             const Text('SAVED LECTURES'),
             const SizedBox(height: 20),
-            BlocBuilder<FavoriteSongsCubit, FavoriteSongsState>(
+            BlocBuilder<SavedLecturesCubit, SavedLecturesState>(
                 builder: (context, state) {
-              if (state is FavoriteSongsLoading) {
+              if (state is SavedLecturesLoading) {
                 return const CircularProgressIndicator();
               }
 
-              if (state is FavoriteSongsLoaded) {
+              if (state is SavedLecturesLoaded) {
                 return ListView.separated(
                   shrinkWrap: true,
                   itemBuilder: (context, index) {
@@ -126,14 +126,14 @@ class ProfilePage extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                                 builder: (BuildContext context) =>
-                                    SongPlayerPage(
-                                        songEntity:
-                                            state.favoriteSongs[index])));
+                                    LecturePlayerPage(
+                                        lectureEntity:
+                                            state.savedLectures[index])));
                       },
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // image songs
+                          // lecture artwork
                           Row(
                             children: [
                               Container(
@@ -144,7 +144,7 @@ class ProfilePage extends StatelessWidget {
                                   image: DecorationImage(
                                     fit: BoxFit.cover,
                                     image: _imageProviderFor(
-                                      state.favoriteSongs[index],
+                                      state.savedLectures[index],
                                     ),
                                   ),
                                 ),
@@ -154,7 +154,7 @@ class ProfilePage extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    state.favoriteSongs[index].title,
+                                    state.savedLectures[index].title,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
@@ -164,7 +164,7 @@ class ProfilePage extends StatelessWidget {
                                     height: 5,
                                   ),
                                   Text(
-                                    state.favoriteSongs[index].artist,
+                                    state.savedLectures[index].summary,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w400,
                                       fontSize: 11,
@@ -178,19 +178,19 @@ class ProfilePage extends StatelessWidget {
                             children: [
                               Text(
                                 _formatDuration(
-                                  state.favoriteSongs[index].duration,
+                                  state.savedLectures[index].duration,
                                 ),
                               ),
                               const SizedBox(
                                 width: 20,
                               ),
-                              FavoriteButton(
-                                songEntity: state.favoriteSongs[index],
+                              SavedLectureButton(
+                                lectureEntity: state.savedLectures[index],
                                 key: UniqueKey(),
                                 function: () {
                                   context
-                                      .read<FavoriteSongsCubit>()
-                                      .removeSong(index);
+                                      .read<SavedLecturesCubit>()
+                                      .removeLecture(index);
                                 },
                               ),
                             ],
@@ -201,11 +201,11 @@ class ProfilePage extends StatelessWidget {
                   },
                   separatorBuilder: (context, state) =>
                       const SizedBox(height: 20),
-                  itemCount: state.favoriteSongs.length,
+                  itemCount: state.savedLectures.length,
                 );
               }
 
-              if (state is FavoriteSongsFailure) {
+              if (state is SavedLecturesFailure) {
                 return const Text('Please try again');
               }
 
@@ -217,12 +217,12 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  ImageProvider _imageProviderFor(SongEntity lecture) {
+  ImageProvider _imageProviderFor(LectureEntity lecture) {
     final imageUrl = lecture.imageUrl;
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return NetworkImage(imageUrl);
     }
-    return const AssetImage(AppImages.homeArtist);
+    return const AssetImage(AppImages.homeArtwork);
   }
 
   String _formatDuration(num durationInSeconds) {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:spotify_with_flutter/core/configs/theme/app_color.dart';
-import 'package:spotify_with_flutter/data/sources/song/song_api_service.dart';
-import 'package:spotify_with_flutter/presentation/subject/pages/subject_detail.dart';
-import 'package:spotify_with_flutter/service_locator.dart';
+import 'package:sage/core/configs/theme/app_color.dart';
+import 'package:sage/data/sources/lecture/lecture_api_service.dart';
+import 'package:sage/presentation/subject/pages/subject_detail.dart';
+import 'package:sage/service_locator.dart';
 
 class SubjectsTab extends StatefulWidget {
   const SubjectsTab({super.key});
@@ -28,7 +28,7 @@ class _SubjectsTabState extends State<SubjectsTab> {
       _error = null;
     });
 
-    final result = await sl<SongApiService>().getSubjects();
+    final result = await sl<LectureApiService>().getSubjects();
     if (!mounted) return;
 
     result.fold(

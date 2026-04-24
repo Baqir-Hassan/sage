@@ -8,6 +8,7 @@ import 'package:sage/core/configs/theme/app_color.dart';
 import 'package:sage/domain/entities/lectures/lecture.dart';
 import 'package:sage/presentation/lecture_player/bloc/lecture_player_cubit.dart';
 import 'package:sage/presentation/lecture_player/bloc/lecture_player_state.dart';
+import 'package:sage/presentation/shutter_widget/shutter_widget.dart';
 
 class LecturePlayerPage extends StatelessWidget {
   final LectureEntity lectureEntity;
@@ -46,19 +47,58 @@ class LecturePlayerPage extends StatelessWidget {
             summary: lectureEntity.summary,
             imageUrl: lectureEntity.imageUrl,
           ),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-            child: Column(
-              children: [
-                _coverArtwork(context),
-                const SizedBox(height: 10),
-                _lectureDetail(),
-                const SizedBox(height: 30),
-                _playbackControls(context),
-              ],
-            ),
-          ),
+        child: BlocBuilder<LecturePlayerCubit, LecturePlayerState>(
+          builder: (context, state) {
+            if (state is LecturePlayerLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (state is LecturePlayerFailure) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 30),
+                  child: Text(
+                    'Audio is not ready for this lecture yet.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }
+
+            final cubit = context.read<LecturePlayerCubit>();
+            final duration = cubit.playbackDuration == Duration.zero
+                ? Duration(seconds: lectureEntity.duration.toInt())
+                : cubit.playbackDuration;
+            final durationMs = duration.inMilliseconds;
+            final progress = durationMs <= 0
+                ? 0.0
+                : (cubit.playbackPosition.inMilliseconds / durationMs).clamp(0.0, 1.0);
+
+            return SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: Column(
+                  children: [
+                    _coverArtwork(context),
+                    const SizedBox(height: 18),
+                    _lectureDetail(),
+                    const SizedBox(height: 28),
+                    ShutterWidget(
+                      title: lectureEntity.title,
+                      subtitle: lectureEntity.summary,
+                      progress: progress,
+                      elapsed: cubit.playbackPosition,
+                      total: duration,
+                      isPlaying: cubit.audioPlayer.playing,
+                      imageUrl: lectureEntity.imageUrl,
+                      onTogglePlayback: cubit.togglePlayback,
+                      onSeek: cubit.seekToFraction,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -119,88 +159,6 @@ class LecturePlayerPage extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Widget _playbackControls(BuildContext context) {
-    return BlocBuilder<LecturePlayerCubit, LecturePlayerState>(
-      builder: (BuildContext context, LecturePlayerState state) {
-        if (state is LecturePlayerLoading) {
-          return const CircularProgressIndicator();
-        }
-
-        if (state is LecturePlayerFailure) {
-          return const Text(
-            'Audio is not ready for this lecture yet.',
-            textAlign: TextAlign.center,
-          );
-        }
-
-        if (state is LecturePlayerLoaded) {
-          return Column(
-            children: [
-              Slider(
-                value: context
-                    .read<LecturePlayerCubit>()
-                    .playbackPosition
-                    .inSeconds
-                    .toDouble(),
-                min: 0.0,
-                max: context
-                    .read<LecturePlayerCubit>()
-                    .playbackDuration
-                    .inSeconds
-                    .toDouble(),
-                onChanged: (value) {},
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _formatDuration(
-                        context.read<LecturePlayerCubit>().playbackPosition),
-                  ),
-                  Text(
-                    _formatDuration(
-                        context.read<LecturePlayerCubit>().playbackDuration),
-                  )
-                ],
-              ),
-              const SizedBox(height: 20),
-              GestureDetector(
-                onTap: () {
-                  context.read<LecturePlayerCubit>().togglePlayback();
-                },
-                child: Container(
-                  height: 60,
-                  width: 60,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary,
-                  ),
-                  child: Icon(
-                    context.read<LecturePlayerCubit>().audioPlayer.playing
-                        ? Icons.pause
-                        : Icons.play_arrow,
-                    color: context.isDarkMode
-                        ? AppColors.white
-                        : AppColors.darkGrey,
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-
-        return Container();
-      },
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   ImageProvider _imageProviderFor(LectureEntity lecture) {

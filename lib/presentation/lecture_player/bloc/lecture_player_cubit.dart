@@ -76,6 +76,23 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
     );
   }
 
+  Future<void> seekToFraction(double progress) async {
+    final duration = playbackDuration;
+    if (duration == Duration.zero) {
+      return;
+    }
+
+    final clampedProgress = progress.clamp(0.0, 1.0);
+    final target = Duration(
+      milliseconds: (duration.inMilliseconds * clampedProgress).round(),
+    );
+    await audioPlayer.seek(target);
+    playbackPosition = target;
+    emit(
+      LecturePlayerLoaded(),
+    );
+  }
+
   @override
   Future<void> close() {
     audioPlayer.dispose();

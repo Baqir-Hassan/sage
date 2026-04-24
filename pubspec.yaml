@@ -39,11 +39,8 @@ dependencies:
   flutter_bloc:
   hydrated_bloc:
   path_provider:
-  firebase_core:
-  firebase_auth:
   get_it:
   dartz:
-  cloud_firestore:
   just_audio:
   just_audio_background:
   diacritic:

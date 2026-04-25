@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:sage/common/helpers/is_dark_mode.dart';
@@ -10,6 +11,7 @@ import 'package:sage/presentation/home/widgets/subjects_tab.dart';
 import 'package:sage/presentation/home/widgets/uploads_tab.dart';
 import 'package:sage/presentation/profile/page/profile.dart';
 import 'package:sage/presentation/upload/pages/upload_notes.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,6 +21,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+  static const String _apkDownloadUrl = 'https://sageai.live/downloads/sage-android.apk';
   late TabController _tabController;
 
   @override
@@ -70,6 +73,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       elevation: 0,
       actions: [
+        if (kIsWeb)
+          IconButton(
+            onPressed: () async {
+              final uri = Uri.parse(_apkDownloadUrl);
+              final launched = await launchUrl(
+                uri,
+                mode: LaunchMode.platformDefault,
+                webOnlyWindowName: '_blank',
+              );
+              if (!launched && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to open APK download link.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.download_rounded),
+          ),
         IconButton(
           onPressed: () {
             Navigator.push(

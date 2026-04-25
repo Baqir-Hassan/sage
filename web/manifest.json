@@ -1,11 +1,11 @@
 {
-    "name": "spotify_with_flutter",
-    "short_name": "spotify_with_flutter",
+    "name": "Sage",
+    "short_name": "Sage",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Turn notes into audio lectures.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -2,6 +2,12 @@
 
 Sage is a final year project that turns study material into spoken lectures. Users can upload `PDF` and `PPTX` notes, choose a narration voice, and generate audio lecture sections that can be played back inside the Flutter app.
 
+## Live Links
+
+- Web app: [https://sageai.live](https://sageai.live)
+- API base: [https://api.sageai.live](https://api.sageai.live)
+- APK download: [https://sageai.live/downloads/sage-android.apk](https://sageai.live/downloads/sage-android.apk)
+
 ## What It Does
 
 - Upload lecture notes as `PDF` or `PPTX`
@@ -29,6 +35,7 @@ This repository contains two main parts:
 - `audio_service` (Android lock screen / notification controls)
 - `flutter_svg`
 - Web build support (runs in Chrome, deployable to Netlify)
+- Web-only APK download button (Get Started + Home app bar)
 
 ### Backend
 
@@ -63,7 +70,10 @@ Legacy `.ppt` files are not supported.
 
 - **Backend**: runs on an EC2 instance, managed with `systemd` services.
 - **Database**: SQLite (current deployment).
-- **Frontend**: Flutter app (Android) and Flutter web build (for portfolio demo).
+- **Frontend**: Flutter app (Android) and Flutter web build on Netlify.
+- **Domains**:
+  - `sageai.live` -> Netlify (web)
+  - `api.sageai.live` -> EC2 backend API
 
 ## Local Development
 
@@ -126,6 +136,19 @@ flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000
 flutter build web --release --dart-define=API_BASE_URL=https://api.sageai.live
 flutter run -d chrome --dart-define=API_BASE_URL=https://api.sageai.live
 ```
+
+For Netlify deployment, publish the generated `build/web` directory.
+
+### 6. Netlify/domain notes
+
+- Web tab title and manifest name are set to **Sage**.
+- Web favicon points to the app logo asset.
+- APK download button is shown on web only and links to:
+  - `https://sageai.live/downloads/sage-android.apk`
+- Keep backend CORS origins aligned with deployed frontend domains:
+  - `https://sageai.live`
+  - `https://www.sageai.live`
+  - optional Netlify preview domain(s)
 
 ## Environment Notes
 

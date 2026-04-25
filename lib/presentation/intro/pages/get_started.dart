@@ -6,11 +6,12 @@ import 'package:sage/core/configs/assets/app_images.dart';
 import 'package:sage/core/configs/assets/app_vectors.dart';
 import 'package:sage/core/configs/theme/app_color.dart';
 import 'package:sage/presentation/choose_mode/pages/choose_mode.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class GetStartedPage extends StatelessWidget {
   const GetStartedPage({super.key});
 
-  static const String _apkDownloadUrl = '';
+  static const String _apkDownloadUrl = 'https://sageai.live/downloads/sage-android.apk';
 
   @override
   Widget build(BuildContext context) {
@@ -90,17 +91,21 @@ class GetStartedPage extends StatelessWidget {
                 if (kIsWeb) ...[
                   const SizedBox(height: 14),
                   OutlinedButton.icon(
-                    onPressed: () {
-                      if (_apkDownloadUrl.isEmpty) {
+                    onPressed: () async {
+                      final uri = Uri.parse(_apkDownloadUrl);
+                      final launched = await launchUrl(
+                        uri,
+                        mode: LaunchMode.platformDefault,
+                        webOnlyWindowName: '_blank',
+                      );
+                      if (!launched && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('APK download link coming soon.'),
+                            content: Text('Unable to open APK download link.'),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
-                        return;
                       }
-                      // Intentionally left for later: open _apkDownloadUrl in a new tab.
                     },
                     icon: const Icon(Icons.download_rounded),
                     label: const Text('Download Android APK'),

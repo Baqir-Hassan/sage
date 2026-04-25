@@ -49,3 +49,4 @@ ios/Runner.xcodeproj/project.pbxproj
 
 backend/.env
 .env
+web/downloads/

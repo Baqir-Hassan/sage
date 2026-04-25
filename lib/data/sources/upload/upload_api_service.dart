@@ -5,6 +5,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sage/core/constants/api_urls.dart';
+import 'package:sage/data/sources/api/api_client.dart';
+import 'package:sage/data/sources/auth/auth_token_provider.dart';
+import 'package:sage/service_locator.dart';
 
 abstract class UploadApiService {
   Future<Either> uploadDocument({
@@ -20,10 +23,13 @@ abstract class UploadApiService {
 }
 
 class UploadApiServiceImpl extends UploadApiService {
-  static const _tokenKey = 'auth_token';
-
+  // Kept in constructor to avoid churn in service locator wiring.
+  // ignore: unused_field
   final http.Client _client;
+  // ignore: unused_field
   final SharedPreferences _preferences;
+  final ApiClient _apiClient = sl<ApiClient>();
+  final AuthTokenProvider _tokenProvider = sl<AuthTokenProvider>();
 
   UploadApiServiceImpl({
     required http.Client client,
@@ -39,7 +45,7 @@ class UploadApiServiceImpl extends UploadApiService {
     String? subjectName,
   }) async {
     try {
-      final token = _preferences.getString(_tokenKey);
+      final token = _tokenProvider.getToken();
       if (token == null || token.isEmpty) {
         return const Left('Please sign in before uploading notes.');
       }
@@ -50,7 +56,12 @@ class UploadApiServiceImpl extends UploadApiService {
       }
 
       final request = http.MultipartRequest('POST', Uri.parse(ApiUrls.uploads))
-        ..headers['Authorization'] = 'Bearer $token'
+        ..headers.addAll(
+          _apiClient.headers(
+            json: false,
+            authenticated: true,
+          ),
+        )
         ..fields['voice_option'] = voiceOption;
 
       if (subjectId != null && subjectId.trim().isNotEmpty) {
@@ -84,110 +95,39 @@ class UploadApiServiceImpl extends UploadApiService {
 
   @override
   Future<Either> getUploadLimits() async {
-    try {
-      final token = _preferences.getString(_tokenKey);
-      if (token == null || token.isEmpty) {
-        return const Left('Please sign in before viewing usage limits.');
-      }
-
-      final response = await _client.get(
-        Uri.parse(ApiUrls.uploadLimits),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      final body = _decodeResponse(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return Right(body);
-      }
-
-      return Left(_extractError(body, fallback: 'Unable to load usage limits.'));
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
+    if (_tokenProvider.getToken() == null) {
+      return const Left('Please sign in before viewing usage limits.');
     }
+    final result = await _apiClient.getJson(ApiUrls.uploadLimits);
+    return result.fold((l) => Left(l), (r) => Right(r));
   }
 
   @override
   Future<Either> listUploads() async {
-    try {
-      final token = _preferences.getString(_tokenKey);
-      if (token == null || token.isEmpty) {
-        return const Left('Please sign in before viewing uploads.');
-      }
-
-      final response = await _client.get(
-        Uri.parse(ApiUrls.uploads),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      final body = _decodeResponse(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return Right(body);
-      }
-
-      return Left(_extractError(body, fallback: 'Unable to load uploads.'));
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
+    if (_tokenProvider.getToken() == null) {
+      return const Left('Please sign in before viewing uploads.');
     }
+    final result = await _apiClient.getJson(ApiUrls.uploads);
+    return result.fold((l) => Left(l), (r) => Right(r));
   }
 
   @override
   Future<Either> getUploadStatus(String documentId) async {
-    try {
-      final token = _preferences.getString(_tokenKey);
-      if (token == null || token.isEmpty) {
-        return const Left('Please sign in before viewing upload status.');
-      }
-
-      final response = await _client.get(
-        Uri.parse(ApiUrls.uploadStatus(documentId)),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      final body = _decodeResponse(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return Right(body);
-      }
-
-      return Left(_extractError(body, fallback: 'Unable to load upload status.'));
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
+    if (_tokenProvider.getToken() == null) {
+      return const Left('Please sign in before viewing upload status.');
     }
+    final result = await _apiClient.getJson(ApiUrls.uploadStatus(documentId));
+    return result.fold((l) => Left(l), (r) => Right(r));
   }
 
   @override
   Future<Either> deleteUpload(String documentId) async {
-    try {
-      final token = _preferences.getString(_tokenKey);
-      if (token == null || token.isEmpty) {
-        return const Left('Please sign in before deleting uploads.');
-      }
-
-      final response = await _client.delete(
-        Uri.parse(ApiUrls.uploadById(documentId)),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return const Right(true);
-      }
-
-      final body = _decodeResponse(response.body);
-      return Left(_extractError(body, fallback: 'Unable to delete upload.'));
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
+    if (_tokenProvider.getToken() == null) {
+      return const Left('Please sign in before deleting uploads.');
     }
+
+    final result = await _apiClient.deleteJson(ApiUrls.uploadById(documentId));
+    return result.fold((l) => Left(l), (_) => const Right(true));
   }
 
   dynamic _decodeResponse(String body) {

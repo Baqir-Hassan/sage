@@ -1,10 +1,9 @@
-import 'dart:convert';
-
 import 'package:dartz/dartz.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sage/core/constants/api_urls.dart';
+import 'package:sage/data/sources/api/api_client.dart';
 import 'package:sage/domain/entities/lectures/lecture.dart';
+import 'package:sage/service_locator.dart';
 
 abstract class LectureApiService {
   Future<Either> getRecentLectures();
@@ -22,119 +21,85 @@ abstract class LectureApiService {
 }
 
 class LectureApiServiceImpl extends LectureApiService {
-  static const _tokenKey = 'auth_token';
   static const _savedLectureIdsKey = 'saved_lecture_ids';
 
-  final http.Client _client;
   final SharedPreferences _preferences;
+  final ApiClient _apiClient = sl<ApiClient>();
 
   LectureApiServiceImpl({
-    required http.Client client,
     required SharedPreferences preferences,
-  })  : _client = client,
-        _preferences = preferences;
+  }) : _preferences = preferences;
 
   @override
   Future<Either> getRecentLectures() async {
-    try {
-      final response = await _client.get(
-        Uri.parse(ApiUrls.libraryHome),
-        headers: _authorizedHeaders(),
-      );
-
-      if (!_isSuccess(response.statusCode)) {
-        return Left(
-            _extractError(response.body, 'Unable to load recent lectures.'));
-      }
-
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final lectures = (body['recent_lectures'] as List<dynamic>? ?? [])
-          .cast<Map<String, dynamic>>();
-      final items = await Future.wait(lectures.map(_buildLectureCard));
-      return Right(items);
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+    final result = await _apiClient.getJson(ApiUrls.libraryHome);
+    return result.fold(
+      (failure) => Left(failure),
+      (body) async {
+        if (body is! Map<String, dynamic>) {
+          return const Left('Unable to load recent lectures.');
+        }
+        final lectures = (body['recent_lectures'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>();
+        final items = await Future.wait(lectures.map(_buildLectureCard));
+        return Right(items);
+      },
+    );
   }
 
   @override
   Future<Either> getLectureLibrary() async {
-    try {
-      final response = await _client.get(
-        Uri.parse(ApiUrls.lectures),
-        headers: _authorizedHeaders(),
-      );
-
-      if (!_isSuccess(response.statusCode)) {
-        return Left(_extractError(response.body, 'Unable to load lectures.'));
-      }
-
-      final body = jsonDecode(response.body) as List<dynamic>;
-      final lectures = body.cast<Map<String, dynamic>>();
-      final items = await Future.wait(lectures.map(_buildLectureCard));
-      return Right(items);
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+    final result = await _apiClient.getJson(ApiUrls.lectures);
+    return result.fold(
+      (failure) => Left(failure),
+      (body) async {
+        if (body is! List<dynamic>) {
+          return const Left('Unable to load lectures.');
+        }
+        final lectures = body.cast<Map<String, dynamic>>();
+        final items = await Future.wait(lectures.map(_buildLectureCard));
+        return Right(items);
+      },
+    );
   }
 
   @override
   Future<Either> getSubjects() async {
-    try {
-      final response = await _client.get(
-        Uri.parse(ApiUrls.subjects),
-        headers: _authorizedHeaders(),
-      );
-
-      if (!_isSuccess(response.statusCode)) {
-        return Left(_extractError(response.body, 'Unable to load subjects.'));
-      }
-
-      final body = jsonDecode(response.body) as List<dynamic>;
-      final subjects = body.cast<Map<String, dynamic>>();
-      return Right(subjects);
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+    final result = await _apiClient.getJson(ApiUrls.subjects);
+    return result.fold(
+      (failure) => Left(failure),
+      (body) {
+        if (body is! List<dynamic>) {
+          return const Left('Unable to load subjects.');
+        }
+        return Right(body.cast<Map<String, dynamic>>());
+      },
+    );
   }
 
   @override
   Future<Either> getSubjectLectures(String subjectId) async {
-    try {
-      final response = await _client.get(
-        Uri.parse(ApiUrls.subjectLectures(subjectId)),
-        headers: _authorizedHeaders(),
-      );
-
-      if (!_isSuccess(response.statusCode)) {
-        return Left(_extractError(response.body, 'Unable to load subject lectures.'));
-      }
-
-      final body = jsonDecode(response.body) as List<dynamic>;
-      final lectures = body.cast<Map<String, dynamic>>();
-      final items = await Future.wait(lectures.map(_buildLectureCard));
-      return Right(items);
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+    final result = await _apiClient.getJson(ApiUrls.subjectLectures(subjectId));
+    return result.fold(
+      (failure) => Left(failure),
+      (body) async {
+        if (body is! List<dynamic>) {
+          return const Left('Unable to load subject lectures.');
+        }
+        final lectures = body.cast<Map<String, dynamic>>();
+        final items = await Future.wait(lectures.map(_buildLectureCard));
+        return Right(items);
+      },
+    );
   }
 
   @override
   Future<Either> deleteSubject(String subjectId) async {
-    try {
-      final response = await _client.delete(
-        Uri.parse(ApiUrls.subjectById(subjectId)),
-        headers: _authorizedHeaders(),
-      );
-
-      if (_isSuccess(response.statusCode)) {
-        return const Right(true);
-      }
-
-      return Left(_extractError(response.body, 'Unable to delete subject.'));
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+    final result = await _apiClient.deleteJson(ApiUrls.subjectById(subjectId));
+    return result.fold(
+      (failure) => Left(failure),
+      (_) => const Right(true),
+    );
   }
 
   @override
@@ -180,70 +145,45 @@ class LectureApiServiceImpl extends LectureApiService {
 
   @override
   Future<Either> deleteLecture(String lectureId) async {
-    try {
-      final response = await _client.delete(
-        Uri.parse(ApiUrls.lectureById(lectureId)),
-        headers: _authorizedHeaders(),
-      );
-
-      if (_isSuccess(response.statusCode)) {
-        final savedLectureIds = _preferences.getStringList(_savedLectureIdsKey) ?? <String>[];
+    final result = await _apiClient.deleteJson(ApiUrls.lectureById(lectureId));
+    return result.fold(
+      (failure) => Left(failure),
+      (_) async {
+        final savedLectureIds =
+            _preferences.getStringList(_savedLectureIdsKey) ?? <String>[];
         savedLectureIds.remove(lectureId);
         await _preferences.setStringList(_savedLectureIdsKey, savedLectureIds);
         return const Right(true);
-      }
-
-      return Left(_extractError(response.body, 'Unable to delete lecture.'));
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+      },
+    );
   }
 
   @override
   Future<Either> getLectureTracks(String lectureId) async {
-    try {
-      final response = await _client.get(
-        Uri.parse(ApiUrls.lectureTracks(lectureId)),
-        headers: _authorizedHeaders(),
-      );
-
-      if (!_isSuccess(response.statusCode)) {
-        return Left(_extractError(response.body, 'Unable to load lecture tracks.'));
-      }
-
-      final body = jsonDecode(response.body) as List<dynamic>;
-      final tracks = body.cast<Map<String, dynamic>>().map((track) {
-        final mediaUrl = track['media_url'] as String?;
-        final fullUrl = _resolveMediaUrl(mediaUrl);
-
-        return {
-          ...track,
-          'media_url': fullUrl,
-        };
-      }).toList();
-
-      return Right(tracks);
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+    final result = await _apiClient.getJson(ApiUrls.lectureTracks(lectureId));
+    return result.fold(
+      (failure) => Left(failure),
+      (body) {
+        if (body is! List<dynamic>) {
+          return const Left('Unable to load lecture tracks.');
+        }
+        final tracks = body.cast<Map<String, dynamic>>().map((track) {
+          final mediaUrl = track['media_url'] as String?;
+          final fullUrl = _resolveMediaUrl(mediaUrl);
+          return {...track, 'media_url': fullUrl};
+        }).toList();
+        return Right(tracks);
+      },
+    );
   }
 
   @override
   Future<Either> regenerateLecture(String lectureId) async {
-    try {
-      final response = await _client.post(
-        Uri.parse(ApiUrls.lectureRegenerate(lectureId)),
-        headers: _authorizedHeaders(),
-      );
-
-      if (_isSuccess(response.statusCode)) {
-        return const Right(true);
-      }
-
-      return Left(_extractError(response.body, 'Unable to regenerate lecture.'));
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+    final result = await _apiClient.postJson(ApiUrls.lectureRegenerate(lectureId));
+    return result.fold(
+      (failure) => Left(failure),
+      (_) => const Right(true),
+    );
   }
 
   Future<LectureEntity> _buildLectureCard(Map<String, dynamic> lecture) async {
@@ -265,22 +205,17 @@ class LectureApiServiceImpl extends LectureApiService {
 
   @override
   Future<Either> getLecture(String lectureId) async {
-    try {
-      final response = await _client.get(
-        Uri.parse(ApiUrls.lectureById(lectureId)),
-        headers: _authorizedHeaders(),
-      );
-
-      if (!_isSuccess(response.statusCode)) {
-        return Left(_extractError(response.body, 'Unable to load lecture.'));
-      }
-
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final item = await _buildLectureCard(body);
-      return Right(item);
-    } catch (_) {
-      return const Left('Unable to connect to the backend.');
-    }
+    final result = await _apiClient.getJson(ApiUrls.lectureById(lectureId));
+    return result.fold(
+      (failure) => Left(failure),
+      (body) async {
+        if (body is! Map<String, dynamic>) {
+          return const Left('Unable to load lecture.');
+        }
+        final item = await _buildLectureCard(body);
+        return Right(item);
+      },
+    );
   }
 
   String _buildSubtitle(Map<String, dynamic> lecture) {
@@ -295,29 +230,6 @@ class LectureApiServiceImpl extends LectureApiService {
     }
 
     return 'Generated lecture';
-  }
-
-  Map<String, String> _authorizedHeaders() {
-    final token = _preferences.getString(_tokenKey) ?? '';
-    return {
-      'Content-Type': 'application/json',
-      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  bool _isSuccess(int statusCode) => statusCode >= 200 && statusCode < 300;
-
-  String _extractError(String body, String fallback) {
-    try {
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) {
-        final detail = decoded['detail'];
-        if (detail is String && detail.isNotEmpty) {
-          return detail;
-        }
-      }
-    } catch (_) {}
-    return fallback;
   }
 
   String? _resolveMediaUrl(String? mediaUrl) {

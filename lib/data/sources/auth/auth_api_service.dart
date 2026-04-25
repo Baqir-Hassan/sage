@@ -1,14 +1,14 @@
-import 'dart:convert';
-
 import 'package:dartz/dartz.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sage/core/constants/api_urls.dart';
 import 'package:sage/core/constants/app_urls.dart';
+import 'package:sage/data/sources/api/api_client.dart';
+import 'package:sage/data/sources/auth/auth_token_provider.dart';
 import 'package:sage/data/models/auth/create_user_req.dart';
 import 'package:sage/data/models/auth/signin_user_req.dart';
 import 'package:sage/data/models/auth/user.dart';
-import 'package:sage/domain/entities/auth/user.dart';
+import 'package:sage/service_locator.dart';
 
 abstract class AuthApiService {
   Future<Either> signup(CreateUserReq createUserReq);
@@ -18,10 +18,14 @@ abstract class AuthApiService {
 }
 
 class AuthApiServiceImpl extends AuthApiService {
-  static const _tokenKey = 'auth_token';
-
+  // Kept in constructor to avoid churn in service locator wiring.
+  // The actual network/token logic is centralized in ApiClient/AuthTokenProvider.
+  // ignore: unused_field
   final http.Client _client;
+  // ignore: unused_field
   final SharedPreferences _preferences;
+  final ApiClient _apiClient = sl<ApiClient>();
+  final AuthTokenProvider _tokenProvider = sl<AuthTokenProvider>();
 
   AuthApiServiceImpl({
     required http.Client client,
@@ -31,114 +35,79 @@ class AuthApiServiceImpl extends AuthApiService {
 
   @override
   Future<Either> signup(CreateUserReq createUserReq) async {
-    try {
-      final response = await _client.post(
-        Uri.parse(ApiUrls.signup),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'full_name': createUserReq.fullName,
-          'email': createUserReq.email,
-          'password': createUserReq.password,
-        }),
-      );
+    final result = await _apiClient.postJson(
+      ApiUrls.signup,
+      authenticated: false,
+      body: {
+        'full_name': createUserReq.fullName,
+        'email': createUserReq.email,
+        'password': createUserReq.password,
+      },
+    );
 
-      final body = _decodeResponse(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final token = body['access_token'] as String?;
-        if (token != null) {
-          await _preferences.setString(_tokenKey, token);
+    return result.fold(
+      (failure) => Left(failure),
+      (body) async {
+        if (body is Map<String, dynamic>) {
+          final token = body['access_token'] as String?;
+          if (token != null && token.isNotEmpty) {
+            await _tokenProvider.setToken(token);
+          }
         }
         return const Right('Signup was successful');
-      }
-
-      return Left(_extractError(body, fallback: 'Unable to create account.'));
-    } catch (_) {
-      return const Left('Unable to connect to the server.');
-    }
+      },
+    );
   }
 
   @override
   Future<Either> signin(SigninUserReq signinUserReq) async {
-    try {
-      final response = await _client.post(
-        Uri.parse(ApiUrls.login),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': signinUserReq.email,
-          'password': signinUserReq.password,
-        }),
-      );
+    final result = await _apiClient.postJson(
+      ApiUrls.login,
+      authenticated: false,
+      body: {
+        'email': signinUserReq.email,
+        'password': signinUserReq.password,
+      },
+    );
 
-      final body = _decodeResponse(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final token = body['access_token'] as String?;
-        if (token != null) {
-          await _preferences.setString(_tokenKey, token);
+    return result.fold(
+      (failure) => Left(failure),
+      (body) async {
+        if (body is Map<String, dynamic>) {
+          final token = body['access_token'] as String?;
+          if (token != null && token.isNotEmpty) {
+            await _tokenProvider.setToken(token);
+          }
         }
         return const Right('Signin was successful');
-      }
-
-      return Left(_extractError(body, fallback: 'Unable to sign in.'));
-    } catch (_) {
-      return const Left('Unable to connect to the server.');
-    }
+      },
+    );
   }
 
   @override
   Future<Either> getUser() async {
-    try {
-      final token = _preferences.getString(_tokenKey);
-      if (token == null || token.isEmpty) {
-        return const Left('Please sign in first.');
-      }
+    if (_tokenProvider.getToken() == null) {
+      return const Left('Please sign in first.');
+    }
 
-      final response = await _client.get(
-        Uri.parse(ApiUrls.me),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      final body = _decodeResponse(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
+    final result = await _apiClient.getJson(ApiUrls.me, authenticated: true);
+    return result.fold(
+      (failure) => Left(failure),
+      (body) {
+        if (body is! Map<String, dynamic>) {
+          return const Left('Unable to fetch profile.');
+        }
         final userModel = UserModel.fromApiJson(body);
         if ((userModel.imageURL ?? '').isEmpty) {
           userModel.imageURL = AppUrls.defaultAvatar;
         }
-        final userEntity = userModel.toEntity();
-        return Right(userEntity);
-      }
-
-      if (response.statusCode == 401) {
-        await _preferences.remove(_tokenKey);
-      }
-
-      return Left(_extractError(body, fallback: 'Unable to fetch profile.'));
-    } catch (_) {
-      return const Left('Unable to connect to the server.');
-    }
+        return Right(userModel.toEntity());
+      },
+    );
   }
 
   @override
   Future<void> signout() async {
-    await _preferences.remove(_tokenKey);
-  }
-
-  dynamic _decodeResponse(String body) {
-    if (body.isEmpty) {
-      return <String, dynamic>{};
-    }
-    return jsonDecode(body);
-  }
-
-  String _extractError(dynamic body, {required String fallback}) {
-    if (body is Map<String, dynamic>) {
-      final detail = body['detail'];
-      if (detail is String && detail.isNotEmpty) {
-        return detail;
-      }
-    }
-    return fallback;
+    await _tokenProvider.clearToken();
   }
 }

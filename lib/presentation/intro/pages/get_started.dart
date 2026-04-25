@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:sage/common/widgets/button/basic_app_button.dart';
@@ -8,6 +9,8 @@ import 'package:sage/presentation/choose_mode/pages/choose_mode.dart';
 
 class GetStartedPage extends StatelessWidget {
   const GetStartedPage({super.key});
+
+  static const String _apkDownloadUrl = '';
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +33,7 @@ class GetStartedPage extends StatelessWidget {
             // child:
           ),
           Container(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
           ),
           Padding(
             padding:
@@ -84,6 +87,25 @@ class GetStartedPage extends StatelessWidget {
                   },
                   title: "Start Learning",
                 ),
+                if (kIsWeb) ...[
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      if (_apkDownloadUrl.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('APK download link coming soon.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      // Intentionally left for later: open _apkDownloadUrl in a new tab.
+                    },
+                    icon: const Icon(Icons.download_rounded),
+                    label: const Text('Download Android APK'),
+                  ),
+                ],
               ],
             ),
           ),

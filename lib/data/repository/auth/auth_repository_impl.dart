@@ -20,4 +20,9 @@ class AuthRepositoryImpl extends AuthRepository {
   Future<Either> getUser() async {
     return await sl<AuthApiService>().getUser();
   }
+
+  @override
+  Future<void> signout() async {
+    await sl<AuthApiService>().signout();
+  }
 }

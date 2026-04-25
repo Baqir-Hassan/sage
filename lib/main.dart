@@ -13,8 +13,10 @@ Future<void> main() async {
   try {
     HydratedBloc.storage = await HydratedStorage.build(
       storageDirectory: kIsWeb
-          ? HydratedStorage.webStorageDirectory
-          : await getApplicationDocumentsDirectory(),
+          ? HydratedStorageDirectory.web
+          : HydratedStorageDirectory(
+              (await getApplicationDocumentsDirectory()).path,
+            ),
     );
   } catch (error, stackTrace) {
     debugPrint('Hydrated storage init failed: $error');

@@ -6,11 +6,14 @@ import 'package:sage/common/widgets/saved_lecture_button/saved_lecture_button.da
 import 'package:sage/core/configs/assets/app_images.dart';
 import 'package:sage/core/configs/theme/app_color.dart';
 import 'package:sage/domain/entities/lectures/lecture.dart';
+import 'package:sage/domain/usecase/auth/signout.dart';
+import 'package:sage/presentation/auth/pages/singin.dart';
 import 'package:sage/presentation/lecture_player/pages/lecture_player.dart';
 import 'package:sage/presentation/profile/bloc/profile_info_cubit.dart';
 import 'package:sage/presentation/profile/bloc/profile_info_state.dart';
 import 'package:sage/presentation/profile/bloc/saved_lectures_cubit.dart';
 import 'package:sage/presentation/profile/bloc/saved_lectures_state.dart';
+import 'package:sage/service_locator.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -86,6 +89,24 @@ class ProfilePage extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          await sl<SignoutUseCase>().call();
+                          if (!context.mounted) return;
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SigninPage(),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                        child: const Text('Log out'),
                       ),
                     ),
                   ],

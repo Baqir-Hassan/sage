@@ -42,6 +42,7 @@ dependencies:
   get_it:
   dartz:
   just_audio:
+  audio_service:
   permission_handler: ^11.3.0
   diacritic:
   http: ^1.2.2

@@ -1,160 +1,133 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sage/core/constants/api_urls.dart';
+import 'package:sage/data/sources/audio/sage_audio_handler.dart';
 import 'package:sage/data/sources/offline/offline_audio_service.dart';
 import 'package:sage/presentation/lecture_player/bloc/lecture_player_state.dart';
 import 'package:sage/service_locator.dart';
 
 class LecturePlayerCubit extends Cubit<LecturePlayerState> {
-  final AudioPlayer audioPlayer = AudioPlayer();
+  final SageAudioHandler _audioHandler = sl<SageAudioHandler>();
+  late final AudioPlayer audioPlayer = _audioHandler.player;
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
 
   Duration playbackDuration = Duration.zero;
   Duration playbackPosition = Duration.zero;
 
+  String? _currentLectureId;
+  String? _currentTitle;
+  String? _currentSummary;
+  String? _currentImageUrl;
+
   LecturePlayerCubit() : super(LecturePlayerLoading()) {
-    audioPlayer.positionStream.listen((position) {
-      playbackPosition = position;
-      updateLecturePlayer();
-    });
+    _subscriptions.add(
+      audioPlayer.positionStream.listen((position) {
+        playbackPosition = position;
+        updateLecturePlayer();
+      }),
+    );
 
-    audioPlayer.durationStream.listen((duration) {
-      playbackDuration = duration ?? Duration.zero;
-      updateLecturePlayer();
-    });
+    _subscriptions.add(
+      audioPlayer.durationStream.listen((duration) {
+        playbackDuration = duration ?? Duration.zero;
+        updateLecturePlayer();
+      }),
+    );
 
-    audioPlayer.playerStateStream.listen((playerState) async {
-      if (playerState.processingState == ProcessingState.completed) {
-        playbackPosition = playbackDuration;
-        await audioPlayer.pause();
-        await audioPlayer.seek(Duration.zero);
-      }
-      updateLecturePlayer();
-    });
+    _subscriptions.add(
+      audioPlayer.playerStateStream.listen((playerState) async {
+        if (playerState.processingState == ProcessingState.completed) {
+          playbackPosition = playbackDuration;
+          await _audioHandler.pause();
+          await _audioHandler.seek(Duration.zero);
+        }
+        updateLecturePlayer();
+      }),
+    );
 
-    audioPlayer.playbackEventStream.listen(
-      (_) {},
-      onError: (error) {
-        debugPrint('Audio playback error: $error');
-        emit(
-          LecturePlayerFailure(),
-        );
-      },
+    _subscriptions.add(
+      audioPlayer.playbackEventStream.listen(
+        (_) {},
+        onError: (error) {
+          debugPrint('Audio playback error: $error');
+          emit(LecturePlayerFailure());
+        },
+      ),
     );
   }
 
   void updateLecturePlayer() {
-    emit(
-      LecturePlayerLoaded(),
-    );
+    emit(LecturePlayerLoaded());
   }
 
   Map<String, String>? _headersFor(String url) {
     try {
       final token = sl<SharedPreferences>().getString('auth_token');
-      
       if (token == null || token.isEmpty) {
-        debugPrint('[_headersFor] No auth token available');
         return null;
       }
 
       final mediaUri = Uri.tryParse(url);
       final apiUri = Uri.tryParse(ApiUrls.baseUrl);
-      
       if (mediaUri == null || apiUri == null) {
-        debugPrint('[_headersFor] Failed to parse URLs - mediaUri: $mediaUri, apiUri: $apiUri');
         return null;
       }
-
-      debugPrint('[_headersFor] Media host: ${mediaUri.host}, API host: ${apiUri.host}');
-      debugPrint('[_headersFor] Media path: ${mediaUri.path}');
 
       final sameHost = mediaUri.host == apiUri.host;
       final protectedPath =
           mediaUri.path.startsWith('/api/') || mediaUri.path.startsWith('/media/');
 
       if (!sameHost || !protectedPath) {
-        debugPrint('[_headersFor] No auth headers needed (sameHost: $sameHost, protectedPath: $protectedPath)');
         return null;
       }
 
-      debugPrint('[_headersFor] Adding auth headers for protected API resource');
-      return {
-        'Authorization': 'Bearer $token',
-      };
-    } catch (e) {
-      debugPrint('[_headersFor] Exception: $e');
+      return {'Authorization': 'Bearer $token'};
+    } catch (_) {
       return null;
     }
   }
 
   Future<bool> _tryLoadLocal(String path) async {
     try {
-      debugPrint('=== ATTEMPTING LOCAL LOAD ===');
-      debugPrint('Raw path: $path');
-      
       if (path.isEmpty) {
-        debugPrint('Path is empty, skipping local load');
         return false;
       }
-      
-      // Try multiple path formats for Android compatibility
-      final pathsToTry = [
-        path, // Raw path as-is
-        'file://$path', // With file:// scheme
-        if (!path.startsWith('file://')) 'file://$path',
-      ];
-      
-      for (final tryPath in pathsToTry) {
-        try {
-          debugPrint('Trying to load with path: $tryPath');
-          await audioPlayer.setFilePath(tryPath);
-          debugPrint('✓ Successfully loaded local audio with path: $tryPath');
-          return true;
-        } catch (e) {
-          debugPrint('✗ Failed with path format $tryPath: $e');
-        }
-      }
-      
-      debugPrint('✗ All local path formats failed for: $path');
-      return false;
-    } catch (e, stackTrace) {
-      debugPrint('✗ Exception in _tryLoadLocal: $e');
-      debugPrintStack(stackTrace: stackTrace);
+
+      await _audioHandler.load(
+        id: _currentLectureId ?? path,
+        title: _currentTitle ?? 'Lecture Playback',
+        summary: _currentSummary ?? 'AI narrated lesson',
+        imageUrl: _currentImageUrl,
+        filePath: path,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Failed to load local audio [$path]: $e');
       return false;
     }
   }
 
   Future<bool> _tryLoadRemote(String url) async {
     try {
-      debugPrint('=== ATTEMPTING REMOTE LOAD ===');
-      debugPrint('URL: $url');
-      debugPrint('URL is empty: ${url.isEmpty}');
-      
       if (url.isEmpty) {
-        debugPrint('URL is empty, skipping remote load');
         return false;
       }
-      
-      // Check if this is an S3 URL that might need special handling
-      final headers = _headersFor(url);
-      if (headers != null) {
-        debugPrint('Using auth headers - Bearer token included');
-      } else {
-        debugPrint('No auth headers needed for this URL');
-      }
-      
-      debugPrint('Calling audioPlayer.setUrl()...');
-      await audioPlayer.setUrl(
-        url,
-        headers: headers,
+
+      await _audioHandler.load(
+        id: _currentLectureId ?? url,
+        title: _currentTitle ?? 'Lecture Playback',
+        summary: _currentSummary ?? 'AI narrated lesson',
+        imageUrl: _currentImageUrl,
+        url: url,
+        headers: _headersFor(url),
       );
-      debugPrint('✓ Successfully loaded remote audio: $url');
       return true;
-    } catch (e, stackTrace) {
-      debugPrint('✗ Failed to load remote audio [$url]: $e');
-      debugPrintStack(stackTrace: stackTrace);
+    } catch (e) {
+      debugPrint('Failed to load remote audio [$url]: $e');
       return false;
     }
   }
@@ -167,17 +140,12 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
     String? localAudioPath,
     String? imageUrl,
   }) async {
-    debugPrint('\n');
-    debugPrint('╔════════════════════════════════════════════════════════╗');
-    debugPrint('║          LECTURE AUDIO LOADING STARTED                 ║');
-    debugPrint('╚════════════════════════════════════════════════════════╝');
-    debugPrint('Lecture ID: $lectureId');
-    debugPrint('Title: $title');
-    debugPrint('URL provided: ${url.isEmpty ? '(EMPTY)' : url}');
-    debugPrint('Local audio path provided: ${localAudioPath?.isEmpty ?? true ? '(EMPTY)' : localAudioPath}');
-    
+    _currentLectureId = lectureId;
+    _currentTitle = title;
+    _currentSummary = summary;
+    _currentImageUrl = imageUrl;
+
     if (url.isEmpty && (localAudioPath == null || localAudioPath.isEmpty)) {
-      debugPrint('✗ CRITICAL: Both url and localAudioPath are empty!');
       emit(LecturePlayerFailure());
       return;
     }
@@ -185,8 +153,7 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
     try {
       playbackDuration = Duration.zero;
       playbackPosition = Duration.zero;
-      await audioPlayer.stop();
-      debugPrint('Audio player stopped and reset');
+      await _audioHandler.stop();
 
       final offlineAudioService = sl<OfflineAudioService>();
       final resolvedLocalPath =
@@ -194,57 +161,38 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
               ? localAudioPath
               : await offlineAudioService.getLocalLecturePath(lectureId);
 
-      debugPrint('Resolved local path: ${resolvedLocalPath?.isEmpty ?? true ? '(NOT FOUND)' : resolvedLocalPath}');
-
       var didLoad = false;
-
       if (resolvedLocalPath != null && resolvedLocalPath.isNotEmpty) {
-        debugPrint('\n→ Trying local playback first...');
         didLoad = await _tryLoadLocal(resolvedLocalPath);
       }
 
       if (!didLoad && url.isNotEmpty) {
-        debugPrint('\n→ Local playback failed or unavailable, trying remote...');
         didLoad = await _tryLoadRemote(url);
       }
 
       if (!didLoad) {
-        debugPrint('\n✗ FAILED: Could not load audio from any source');
-        debugPrint('  - Local path available: ${resolvedLocalPath?.isNotEmpty ?? false}');
-        debugPrint('  - Remote URL available: ${url.isNotEmpty}');
         emit(LecturePlayerFailure());
         return;
       }
 
-      debugPrint('\n✓ SUCCESS: Audio loaded for lecture $lectureId');
-      debugPrint('Emitting LecturePlayerLoaded state');
       emit(LecturePlayerLoaded());
     } catch (e, stackTrace) {
-      debugPrint('\n✗ EXCEPTION in loadLectureAudio: $e');
+      debugPrint('Exception in loadLectureAudio: $e');
       debugPrintStack(stackTrace: stackTrace);
       emit(LecturePlayerFailure());
     }
-    
-    debugPrint('╔════════════════════════════════════════════════════════╗');
-    debugPrint('║          LECTURE AUDIO LOADING COMPLETED               ║');
-    debugPrint('╚════════════════════════════════════════════════════════╝\n');
   }
 
   Future<void> togglePlayback() async {
     try {
       if (audioPlayer.playing) {
-        await audioPlayer.pause();
+        await _audioHandler.pause();
       } else {
-        await audioPlayer.play();
+        await _audioHandler.play();
       }
-
-      emit(
-        LecturePlayerLoaded(),
-      );
+      emit(LecturePlayerLoaded());
     } catch (_) {
-      emit(
-        LecturePlayerFailure(),
-      );
+      emit(LecturePlayerFailure());
     }
   }
 
@@ -258,16 +206,16 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
     final target = Duration(
       milliseconds: (duration.inMilliseconds * clampedProgress).round(),
     );
-    await audioPlayer.seek(target);
+    await _audioHandler.seek(target);
     playbackPosition = target;
-    emit(
-      LecturePlayerLoaded(),
-    );
+    emit(LecturePlayerLoaded());
   }
 
   @override
-  Future<void> close() {
-    audioPlayer.dispose();
+  Future<void> close() async {
+    for (final subscription in _subscriptions) {
+      await subscription.cancel();
+    }
     return super.close();
   }
 }

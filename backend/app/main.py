@@ -24,6 +24,10 @@ from app.services.readiness_service import collect_readiness_status
 
 
 settings = get_settings()
+configured_origins = [origin for origin in settings.frontend_origin_list if origin != "*"]
+
+if settings.app_env != "development" and not configured_origins:
+    raise RuntimeError("FRONTEND_ORIGINS must be explicitly configured outside development.")
 
 
 @asynccontextmanager
@@ -43,8 +47,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.frontend_origin_list or ["*"],
-    allow_origin_regex=settings.frontend_origin_regex,
+    allow_origins=configured_origins if configured_origins else settings.frontend_origin_list,
+    allow_origin_regex=settings.frontend_origin_regex if not configured_origins else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

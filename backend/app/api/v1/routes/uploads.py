@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.document import Document
 from app.models.lecture import Lecture
@@ -33,6 +34,7 @@ ALLOWED_UPLOAD_CONTENT_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
+UPLOAD_READ_CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
 @router.get("/limits", response_model=UploadLimitsResponse)
@@ -53,6 +55,8 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UploadResponse:
+    settings = get_settings()
+
     try:
         UsageLimitService(db).enforce_new_lecture_limit(current_user.id)
     except DailyLimitExceededError as exc:
@@ -72,8 +76,31 @@ async def upload_document(
             detail="Only PDF and PPTX files are supported.",
         )
 
+    content_length = file.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > settings.max_upload_size_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"File exceeds the {settings.max_upload_size_mb}MB upload limit.",
+                )
+        except ValueError:
+            pass
+
     storage = get_storage_service()
-    file_bytes = await file.read()
+    file_buffer = bytearray()
+    while True:
+        chunk = await file.read(UPLOAD_READ_CHUNK_SIZE)
+        if not chunk:
+            break
+        file_buffer.extend(chunk)
+        if len(file_buffer) > settings.max_upload_size_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds the {settings.max_upload_size_mb}MB upload limit.",
+            )
+
+    file_bytes = bytes(file_buffer)
     storage_key = storage.save_upload(filename, file_bytes)
     resolved_subject_id = _resolve_subject_selection(db, subject_id, subject_name, current_user)
 

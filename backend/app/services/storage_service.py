@@ -1,11 +1,20 @@
-import os
 from pathlib import Path
+import re
 from urllib.parse import urlparse
 from uuid import uuid4
 
 import boto3
 
 from app.core.config import get_settings
+
+
+_SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _sanitize_filename(filename: str) -> str:
+    raw_name = Path(filename).name
+    sanitized = _SAFE_FILENAME_RE.sub("_", raw_name).strip("._")
+    return sanitized or "upload.bin"
 
 
 class LocalStorageService:
@@ -16,7 +25,7 @@ class LocalStorageService:
     def save_upload(self, filename: str, content: bytes) -> str:
         uploads_dir = self.base_path / "uploads"
         uploads_dir.mkdir(parents=True, exist_ok=True)
-        safe_name = filename.replace(" ", "_")
+        safe_name = _sanitize_filename(filename)
         storage_path = uploads_dir / f"{uuid4()}-{safe_name}"
         storage_path.write_bytes(content)
         return str(storage_path)
@@ -97,7 +106,7 @@ class S3StorageService:
         self.client = boto3.client("s3", **client_kwargs)
 
     def save_upload(self, filename: str, content: bytes) -> str:
-        safe_name = filename.replace(" ", "_")
+        safe_name = _sanitize_filename(filename)
         key = f"uploads/{uuid4()}-{safe_name}"
         self.client.put_object(
             Bucket=self.settings.s3_bucket_raw,
@@ -112,7 +121,16 @@ class S3StorageService:
             return candidate
 
         bucket, key = self._parse_s3_uri(storage_key)
-        local_path = self.base_path / "tmp" / bucket / key.replace("/", os.sep)
+        normalized_key = key.replace("\\", "/").strip("/")
+        key_path = Path(normalized_key)
+        if any(part in {"", ".", ".."} for part in key_path.parts):
+            raise ValueError(f"Unsafe S3 storage key path: {storage_key}")
+
+        tmp_root = (self.base_path / "tmp" / bucket).resolve()
+        local_path = (tmp_root / key_path).resolve()
+        if tmp_root != local_path and tmp_root not in local_path.parents:
+            raise ValueError(f"Unsafe S3 storage key path: {storage_key}")
+
         local_path.parent.mkdir(parents=True, exist_ok=True)
         if not local_path.exists():
             self.client.download_file(bucket, key, str(local_path))

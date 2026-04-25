@@ -1,12 +1,14 @@
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sage/core/constants/api_urls.dart';
+import 'package:sage/data/sources/auth/auth_token_provider.dart';
+import 'package:sage/service_locator.dart';
 
 import 'offline_audio_store.dart';
 
 class OfflineAudioService {
   final OfflineAudioStore _store;
-  final SharedPreferences _preferences;
+  final AuthTokenProvider _tokenProvider = sl<AuthTokenProvider>();
 
   OfflineAudioService({
     required http.Client client,
@@ -14,8 +16,7 @@ class OfflineAudioService {
   })  : _store = createOfflineAudioStore(
           client: client,
           preferences: preferences,
-        ),
-        _preferences = preferences;
+        );
 
   Future<String?> downloadLecture({
     required String lectureId,
@@ -26,18 +27,34 @@ class OfflineAudioService {
   }
 
   Map<String, String>? _getDownloadHeaders(String url) {
-    final token = _preferences.getString('auth_token');
+    final token = _tokenProvider.getToken();
     if (token == null || token.isEmpty) {
       return null;
     }
 
-    // If the URL requires authorization, add the token
-    if (url.contains('api.sageai.live') ||
-        url.startsWith('/') ||
-        !url.startsWith('http')) {
-      return {
-        'Authorization': 'Bearer $token',
-      };
+    final apiUri = Uri.tryParse(ApiUrls.baseUrl);
+    if (apiUri == null) {
+      return null;
+    }
+
+    final requestUri = Uri.tryParse(url);
+    if (requestUri == null) {
+      return null;
+    }
+
+    final resolvedUri = requestUri.hasScheme
+        ? requestUri
+        : apiUri.resolveUri(requestUri);
+    if (resolvedUri.scheme != 'https') {
+      return null;
+    }
+    if (resolvedUri.host != apiUri.host) {
+      return null;
+    }
+    final protectedPath = resolvedUri.path.startsWith('/api/') ||
+        resolvedUri.path.startsWith('/media/');
+    if (protectedPath) {
+      return {'Authorization': 'Bearer $token'};
     }
 
     return null;

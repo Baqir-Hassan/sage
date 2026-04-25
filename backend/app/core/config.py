@@ -32,6 +32,7 @@ class Settings(BaseSettings):
         default=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
         alias="FRONTEND_ORIGIN_REGEX",
     )
+    max_upload_size_mb: int = Field(default=50, alias="MAX_UPLOAD_SIZE_MB")
     local_storage_path: str = Field(default="./storage", alias="LOCAL_STORAGE_PATH")
 
     aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
@@ -58,6 +59,10 @@ class Settings(BaseSettings):
     @property
     def use_s3_storage(self) -> bool:
         return self.storage_provider.lower() == "s3"
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return max(self.max_upload_size_mb, 1) * 1024 * 1024
 
 
 @lru_cache

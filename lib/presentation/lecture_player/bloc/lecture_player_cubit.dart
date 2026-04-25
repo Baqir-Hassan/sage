@@ -3,15 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sage/core/constants/api_urls.dart';
 import 'package:sage/data/sources/audio/sage_audio_handler.dart';
+import 'package:sage/data/sources/auth/auth_token_provider.dart';
 import 'package:sage/data/sources/offline/offline_audio_service.dart';
 import 'package:sage/presentation/lecture_player/bloc/lecture_player_state.dart';
 import 'package:sage/service_locator.dart';
 
 class LecturePlayerCubit extends Cubit<LecturePlayerState> {
   final SageAudioHandler _audioHandler = sl<SageAudioHandler>();
+  final AuthTokenProvider _tokenProvider = sl<AuthTokenProvider>();
   late final AudioPlayer audioPlayer = _audioHandler.player;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
@@ -66,7 +67,7 @@ class LecturePlayerCubit extends Cubit<LecturePlayerState> {
 
   Map<String, String>? _headersFor(String url) {
     try {
-      final token = sl<SharedPreferences>().getString('auth_token');
+      final token = _tokenProvider.getToken();
       if (token == null || token.isEmpty) {
         return null;
       }

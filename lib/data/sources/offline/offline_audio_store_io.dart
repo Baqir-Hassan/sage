@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,21 +21,53 @@ class IoOfflineAudioStore implements OfflineAudioStore {
         _preferences = preferences;
 
   @override
-  Future<String?> download(String lectureId, String url) async {
-    final response = await _client.get(Uri.parse(url));
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Unable to download lecture audio.');
+  Future<String?> download(String lectureId, String url, {Map<String, String>? headers}) async {
+    try {
+      debugPrint('Downloading lecture audio - ID: $lectureId, URL: $url');
+      
+      final response = await _client.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+      
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          'Download failed - ID: $lectureId, Status: ${response.statusCode}, '
+          'Content-Length: ${response.bodyBytes.length}',
+        );
+        throw Exception(
+          'Unable to download lecture audio. Server responded with ${response.statusCode}',
+        );
+      }
+
+      debugPrint('Downloaded ${response.bodyBytes.length} bytes for lecture $lectureId');
+
+      final directory = await _offlineAudioDirectory();
+      await directory.create(recursive: true);
+      
+      // Save with .mp3 extension, but ensure file is readable
+      final file = File('${directory.path}/$lectureId.mp3');
+      await file.writeAsBytes(response.bodyBytes, flush: true);
+
+      // Verify file was written correctly
+      final fileSize = await file.length();
+      debugPrint('Saved file for lecture $lectureId: ${file.path} (size: $fileSize bytes)');
+
+      if (fileSize == 0) {
+        throw Exception('Downloaded file is empty or failed to write');
+      }
+
+      final downloads = await _downloads();
+      downloads[lectureId] = file.path;
+      await _preferences.setString(_downloadedLecturesKey, jsonEncode(downloads));
+      
+      debugPrint('Successfully saved lecture audio for ID: $lectureId at path: ${file.path}');
+      return file.path;
+    } catch (e, stackTrace) {
+      debugPrint('Exception downloading lecture $lectureId: $e');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
     }
-
-    final directory = await _offlineAudioDirectory();
-    await directory.create(recursive: true);
-    final file = File('${directory.path}/$lectureId.mp3');
-    await file.writeAsBytes(response.bodyBytes, flush: true);
-
-    final downloads = await _downloads();
-    downloads[lectureId] = file.path;
-    await _preferences.setString(_downloadedLecturesKey, jsonEncode(downloads));
-    return file.path;
   }
 
   @override
@@ -47,11 +80,13 @@ class IoOfflineAudioStore implements OfflineAudioStore {
 
     final file = File(path);
     if (!await file.exists()) {
+      debugPrint('Lecture file not found: $path');
       downloads.remove(lectureId);
       await _preferences.setString(_downloadedLecturesKey, jsonEncode(downloads));
       return null;
     }
 
+    debugPrint('Found local lecture file: $path');
     return path;
   }
 
@@ -68,6 +103,7 @@ class IoOfflineAudioStore implements OfflineAudioStore {
       final file = File(path);
       if (await file.exists()) {
         await file.delete();
+        debugPrint('Deleted lecture file: $path');
       }
       await _preferences.setString(_downloadedLecturesKey, jsonEncode(downloads));
     }

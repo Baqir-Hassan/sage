@@ -5,7 +5,7 @@ import 'offline_audio_store.dart';
 
 class StubOfflineAudioStore implements OfflineAudioStore {
   @override
-  Future<String?> download(String lectureId, String url) async => null;
+  Future<String?> download(String lectureId, String url, {Map<String, String>? headers}) async => null;
 
   @override
   Future<String?> getLocalPath(String lectureId) async => null;

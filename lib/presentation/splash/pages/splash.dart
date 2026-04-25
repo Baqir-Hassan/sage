@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:sage/core/configs/assets/app_vectors.dart';
+import 'package:sage/core/configs/assets/app_images.dart';
 import 'package:sage/presentation/intro/pages/get_started.dart';
 
 class SplashPage extends StatefulWidget {
@@ -20,8 +19,12 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SvgPicture.asset(AppVectors.logo),
+      body: const Center(
+        child: Image(
+          image: AssetImage(AppImages.logo),
+          width: 140,
+          height: 140,
+        ),
       ),
     );
   }

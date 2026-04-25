@@ -7,7 +7,7 @@ import 'offline_audio_store_stub.dart'
 abstract class OfflineAudioStore {
   Future<String?> getLocalPath(String lectureId);
   Future<bool> isDownloaded(String lectureId);
-  Future<String?> download(String lectureId, String url);
+  Future<String?> download(String lectureId, String url, {Map<String, String>? headers});
   Future<void> remove(String lectureId);
 }
 

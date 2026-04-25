@@ -75,7 +75,7 @@ async def upload_document(
     storage = get_storage_service()
     file_bytes = await file.read()
     storage_key = storage.save_upload(filename, file_bytes)
-    resolved_subject_id = _resolve_subject_selection(db, subject_id, subject_name)
+    resolved_subject_id = _resolve_subject_selection(db, subject_id, subject_name, current_user)
 
     document = Document(
         id=str(uuid4()),
@@ -208,7 +208,7 @@ def delete_upload(
     db.commit()
 
 
-def _resolve_subject_selection(db: Session, subject_id: str | None, subject_name: str | None) -> str | None:
+def _resolve_subject_selection(db: Session, subject_id: str | None, subject_name: str | None, current_user: User) -> str | None:
     normalized_subject_name = (subject_name or "").strip()
     if normalized_subject_name:
         base_slug = _slugify_subject_name(normalized_subject_name)
@@ -216,9 +216,17 @@ def _resolve_subject_selection(db: Session, subject_id: str | None, subject_name
         suffix = 2
 
         while True:
-            existing = db.scalar(select(Subject).where(Subject.slug == candidate_slug))
+            existing = db.scalar(
+                select(Subject)
+                .where(Subject.slug == candidate_slug)
+                .where(Subject.user_id == current_user.id)
+            )
             if existing is None:
-                subject = Subject(name=normalized_subject_name, slug=candidate_slug)
+                subject = Subject(
+                    name=normalized_subject_name,
+                    slug=candidate_slug,
+                    user_id=current_user.id,
+                )
                 db.add(subject)
                 db.flush()
                 return subject.id
@@ -227,7 +235,15 @@ def _resolve_subject_selection(db: Session, subject_id: str | None, subject_name
             candidate_slug = f"{base_slug}-{suffix}"
             suffix += 1
 
-    return subject_id or None
+    if subject_id:
+        # Verify that the subject exists and belongs to the current user
+        subject = db.get(Subject, subject_id)
+        if subject and subject.user_id == current_user.id:
+            return subject_id
+        # If subject doesn't exist or doesn't belong to user, return None
+        return None
+
+    return None
 
 
 def _slugify_subject_name(subject_name: str) -> str:

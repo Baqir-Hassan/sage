@@ -12,6 +12,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
 
+    subjects = relationship("Subject", back_populates="user")
     playlists = relationship("Playlist", back_populates="user")
     documents = relationship("Document", back_populates="user")
     lectures = relationship("Lecture", back_populates="owner")

@@ -22,7 +22,11 @@ def list_subjects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[SubjectResponse]:
-    subjects = db.scalars(select(Subject).order_by(Subject.name.asc())).all()
+    subjects = db.scalars(
+        select(Subject)
+        .where(Subject.user_id == current_user.id)
+        .order_by(Subject.name.asc())
+    ).all()
     items: list[SubjectResponse] = []
 
     for subject in subjects:
@@ -60,6 +64,13 @@ def list_subject_lectures(
             detail="Subject not found.",
         )
 
+    # Ensure the subject belongs to the current user
+    if subject.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to view this subject.",
+        )
+
     lectures = db.scalars(
         select(Lecture)
         .join(Document, Document.id == Lecture.document_id)
@@ -89,34 +100,20 @@ def delete_subject(
             detail="Subject not found.",
         )
 
-    has_other_user_documents = db.scalar(
-        select(func.count(Document.id))
-        .where(Document.subject_id == subject_id)
-        .where(Document.user_id != current_user.id)
-    ) or 0
-    has_other_user_playlists = db.scalar(
-        select(func.count(Playlist.id))
-        .where(Playlist.subject_id == subject_id)
-        .where(Playlist.user_id.is_not(None))
-        .where(Playlist.user_id != current_user.id)
-    ) or 0
-
-    if has_other_user_documents or has_other_user_playlists:
+    # Ensure the subject belongs to the current user
+    if subject.user_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "This subject is still used by another account and cannot be deleted yet."
-            ),
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to delete this subject.",
         )
 
+    # Disassociate documents from this subject
     for document in db.scalars(
-        select(Document).where(
-            Document.subject_id == subject_id,
-            Document.user_id == current_user.id,
-        )
+        select(Document).where(Document.subject_id == subject_id)
     ).all():
         document.subject_id = None
 
+    # Disassociate playlists from this subject
     for playlist in db.scalars(
         select(Playlist).where(Playlist.subject_id == subject_id)
     ).all():

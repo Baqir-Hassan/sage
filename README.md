@@ -163,8 +163,3 @@ Local development currently works with:
 - Improve lecture artwork and branding
 - Expand backend test coverage
 - Add deployment automation for EC2 (push-to-deploy)
-- Replace remaining legacy clone assets and storage identifiers
-
-## License
-
-This project was built from an MIT-licensed Flutter starter/clone and has been adapted into a notes-to-audio lecture platform. If you distribute this project, keep the required MIT license attribution from the original source where applicable.

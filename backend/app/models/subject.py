@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, String, Text, UUID
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -12,7 +12,7 @@ class Subject(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     slug: Mapped[str] = mapped_column(String(140), index=True)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
     cover_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
 
     user = relationship("User", back_populates="subjects")
     playlists = relationship("Playlist", back_populates="subject")

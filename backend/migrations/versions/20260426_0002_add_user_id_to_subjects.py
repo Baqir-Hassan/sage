@@ -16,30 +16,44 @@ depends_on = None
 
 
 def upgrade() -> None:
+    dialect_name = op.get_bind().dialect.name
+
     # Add user_id column to subjects table (same type as users.id)
     op.add_column("subjects", sa.Column("user_id", sa.String(), nullable=True))
-    
-    # Create foreign key constraint
-    op.create_foreign_key("fk_subjects_user_id_users_id", "subjects", "users", ["user_id"], ["id"])
-    
+
     # Create index on user_id
     op.create_index(op.f("ix_subjects_user_id"), "subjects", ["user_id"], unique=False)
-    
-    # Remove unique constraints from name and slug (since they should only be unique per user)
-    op.drop_constraint("subjects_name_key", "subjects", type_="unique")
-    op.drop_constraint("subjects_slug_key", "subjects", type_="unique")
+
+    # SQLite does not support ALTER TABLE constraint ops directly.
+    if dialect_name != "sqlite":
+        # Create foreign key constraint
+        op.create_foreign_key(
+            "fk_subjects_user_id_users_id",
+            "subjects",
+            "users",
+            ["user_id"],
+            ["id"],
+        )
+
+        # Remove global unique constraints (now enforced per user at app level)
+        op.drop_constraint("subjects_name_key", "subjects", type_="unique")
+        op.drop_constraint("subjects_slug_key", "subjects", type_="unique")
 
 
 def downgrade() -> None:
-    # Restore unique constraints
-    op.create_unique_constraint("subjects_slug_key", "subjects", ["slug"])
-    op.create_unique_constraint("subjects_name_key", "subjects", ["name"])
-    
+    dialect_name = op.get_bind().dialect.name
+
+    if dialect_name != "sqlite":
+        # Restore unique constraints
+        op.create_unique_constraint("subjects_slug_key", "subjects", ["slug"])
+        op.create_unique_constraint("subjects_name_key", "subjects", ["name"])
+
     # Drop index
     op.drop_index(op.f("ix_subjects_user_id"), table_name="subjects")
-    
-    # Drop foreign key
-    op.drop_constraint("fk_subjects_user_id_users_id", "subjects", type_="foreignkey")
-    
+
+    if dialect_name != "sqlite":
+        # Drop foreign key
+        op.drop_constraint("fk_subjects_user_id_users_id", "subjects", type_="foreignkey")
+
     # Drop column
     op.drop_column("subjects", "user_id")

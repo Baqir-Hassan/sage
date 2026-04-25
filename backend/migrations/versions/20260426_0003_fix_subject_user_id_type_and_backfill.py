@@ -19,14 +19,17 @@ depends_on = None
 
 
 def upgrade() -> None:
+    dialect_name = op.get_bind().dialect.name
+
     # Ensure subjects.user_id uses the same string type as users.id.
-    op.alter_column(
-        "subjects",
-        "user_id",
-        type_=sa.String(),
-        existing_nullable=True,
-        postgresql_using="user_id::text",
-    )
+    if dialect_name == "postgresql":
+        op.alter_column(
+            "subjects",
+            "user_id",
+            type_=sa.String(),
+            existing_nullable=True,
+            postgresql_using="user_id::text",
+        )
 
     # Backfill ownership from existing documents for any missing/invalid links.
     op.execute(

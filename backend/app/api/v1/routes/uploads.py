@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -255,8 +256,15 @@ def _resolve_subject_selection(db: Session, subject_id: str | None, subject_name
                     user_id=current_user.id,
                 )
                 db.add(subject)
-                db.flush()
-                return subject.id
+                try:
+                    db.flush()
+                    return subject.id
+                except IntegrityError:
+                    # Slug already exists (possibly for another user or race condition)
+                    db.rollback()
+                    candidate_slug = f"{base_slug}-{suffix}"
+                    suffix += 1
+                    continue
             if existing.name.lower() == normalized_subject_name.lower():
                 return existing.id
             candidate_slug = f"{base_slug}-{suffix}"

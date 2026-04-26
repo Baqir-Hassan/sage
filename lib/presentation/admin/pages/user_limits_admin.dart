@@ -10,7 +10,7 @@ class UserLimitsAdminPage extends StatefulWidget {
 }
 
 class _UserLimitsAdminPageState extends State<UserLimitsAdminPage> {
-  final TextEditingController _userIdController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _newLectureLimitController = TextEditingController();
   final TextEditingController _regenerationLimitController = TextEditingController();
   final AdminApiService _adminApiService = sl<AdminApiService>();
@@ -21,7 +21,7 @@ class _UserLimitsAdminPageState extends State<UserLimitsAdminPage> {
 
   @override
   void dispose() {
-    _userIdController.dispose();
+    _emailController.dispose();
     _newLectureLimitController.dispose();
     _regenerationLimitController.dispose();
     super.dispose();
@@ -37,9 +37,9 @@ class _UserLimitsAdminPageState extends State<UserLimitsAdminPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
-              controller: _userIdController,
+              controller: _emailController,
               decoration: const InputDecoration(
-                labelText: 'User ID',
+                labelText: 'User Email',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -105,14 +105,14 @@ class _UserLimitsAdminPageState extends State<UserLimitsAdminPage> {
   }
 
   Future<void> _loadCurrentLimits() async {
-    final userId = _userIdController.text.trim();
-    if (userId.isEmpty) {
-      _setStatus('Please provide a user ID.');
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      _setStatus('Please provide a user email.');
       return;
     }
 
     setState(() => _loading = true);
-    final response = await _adminApiService.getUserLimits(userId);
+    final response = await _adminApiService.getUserLimitsByEmail(email);
     response.fold(
       (error) => _setStatus(error),
       (data) {
@@ -132,9 +132,9 @@ class _UserLimitsAdminPageState extends State<UserLimitsAdminPage> {
   }
 
   Future<void> _saveLimits() async {
-    final userId = _userIdController.text.trim();
-    if (userId.isEmpty) {
-      _setStatus('Please provide a user ID.');
+    final userId = _currentLimits?['user_id'] as String?;
+    if (userId == null || userId.isEmpty) {
+      _setStatus('Load a user by email first.');
       return;
     }
 

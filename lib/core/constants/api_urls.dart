@@ -23,4 +23,6 @@ class ApiUrls {
   static String uploadStatus(String documentId) => '$uploads/$documentId/status';
   static String subjectLectures(String subjectId) => '$subjects/$subjectId/lectures';
   static String adminUserLimits(String userId) => '$admin/users/$userId/limits';
+  static String adminUserLimitsByEmail(String email) =>
+      '$admin/users/limits/by-email?email=${Uri.encodeComponent(email)}';
 }

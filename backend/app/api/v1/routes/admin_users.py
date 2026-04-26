@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin
@@ -30,6 +31,32 @@ def get_user_limits(
 
     override = user.usage_override
     usage_summary = UsageLimitService(db).build_usage_summary(user_id)
+
+    return UserLimitResponse(
+        user_id=user.id,
+        daily_new_lecture_limit=usage_summary["daily_new_lecture_limit"],
+        daily_regeneration_limit=usage_summary["daily_regeneration_limit"],
+        override_daily_new_lecture_limit=(
+            override.daily_new_lecture_limit if override else None
+        ),
+        override_daily_regeneration_limit=(
+            override.daily_regeneration_limit if override else None
+        ),
+    )
+
+
+@router.get("/users/limits/by-email", response_model=UserLimitResponse)
+def get_user_limits_by_email(
+    email: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+) -> UserLimitResponse:
+    user = db.scalar(select(User).where(User.email == email))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    override = user.usage_override
+    usage_summary = UsageLimitService(db).build_usage_summary(user.id)
 
     return UserLimitResponse(
         user_id=user.id,

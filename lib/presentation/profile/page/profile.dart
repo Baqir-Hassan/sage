@@ -9,6 +9,7 @@ import 'package:sage/domain/entities/lectures/lecture.dart';
 import 'package:sage/domain/usecase/auth/signout.dart';
 import 'package:sage/presentation/auth/pages/singin.dart';
 import 'package:sage/presentation/lecture_player/pages/lecture_player.dart';
+import 'package:sage/presentation/admin/pages/user_limits_admin.dart';
 import 'package:sage/presentation/profile/bloc/profile_info_cubit.dart';
 import 'package:sage/presentation/profile/bloc/profile_info_state.dart';
 import 'package:sage/presentation/profile/bloc/saved_lectures_cubit.dart';
@@ -107,6 +108,21 @@ class ProfilePage extends StatelessWidget {
                           );
                         },
                         child: const Text('Log out'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const UserLimitsAdminPage(),
+                            ),
+                          );
+                        },
+                        child: const Text('Admin: User Limits'),
                       ),
                     ),
                   ],

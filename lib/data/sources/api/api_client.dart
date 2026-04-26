@@ -59,6 +59,23 @@ class ApiClient {
     }
   }
 
+  Future<Either<String, dynamic>> patchJson(
+    String url, {
+    Object? body,
+    bool authenticated = true,
+  }) async {
+    try {
+      final response = await _client.patch(
+        Uri.parse(url),
+        headers: headers(authenticated: authenticated),
+        body: body == null ? null : jsonEncode(body),
+      );
+      return decodeResponse(response, fallback: 'Request failed.');
+    } catch (_) {
+      return const Left('Unable to connect to the backend.');
+    }
+  }
+
   Future<Either<String, dynamic>> deleteJson(
     String url, {
     bool authenticated = true,

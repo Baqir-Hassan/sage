@@ -11,6 +11,7 @@ class ApiUrls {
   static const String subjects = '$apiV1/subjects';
   static const String uploads = '$apiV1/uploads';
   static const String uploadLimits = '$uploads/limits';
+  static const String admin = '$apiV1/admin';
 
   static String lectureTracks(String lectureId) =>
       '$lectures/$lectureId/tracks';
@@ -21,4 +22,5 @@ class ApiUrls {
   static String uploadById(String documentId) => '$uploads/$documentId';
   static String uploadStatus(String documentId) => '$uploads/$documentId/status';
   static String subjectLectures(String subjectId) => '$subjects/$subjectId/lectures';
+  static String adminUserLimits(String userId) => '$admin/users/$userId/limits';
 }

@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sage/data/repository/auth/auth_repository_impl.dart';
+import 'package:sage/data/sources/admin/admin_api_service.dart';
 import 'package:sage/data/sources/api/api_client.dart';
 import 'package:sage/data/sources/audio/sage_audio_handler.dart';
 import 'package:sage/data/sources/auth/auth_token_provider.dart';
@@ -78,6 +79,10 @@ Future<void> initializeDependencies() async {
       client: sl<http.Client>(),
       preferences: sl<SharedPreferences>(),
     ),
+  );
+
+  sl.registerSingleton<AdminApiService>(
+    AdminApiServiceImpl(),
   );
 
   sl.registerSingleton<OfflineAudioService>(

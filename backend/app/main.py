@@ -19,6 +19,7 @@ from app.models import (  # noqa: F401
     ProcessingJob,
     Subject,
     User,
+    UserUsageOverride,
 )
 from app.services.readiness_service import collect_readiness_status
 

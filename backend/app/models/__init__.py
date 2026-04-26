@@ -7,6 +7,7 @@ from app.models.playlist_lecture import PlaylistLecture
 from app.models.processing_job import ProcessingJob
 from app.models.subject import Subject
 from app.models.user import User
+from app.models.user_usage_override import UserUsageOverride
 
 __all__ = [
     "AudioTrack",
@@ -18,4 +19,5 @@ __all__ = [
     "ProcessingJob",
     "Subject",
     "User",
+    "UserUsageOverride",
 ]

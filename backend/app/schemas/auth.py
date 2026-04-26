@@ -12,6 +12,14 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=512)
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -19,6 +27,7 @@ class UserResponse(BaseModel):
     full_name: str
     email: EmailStr
     is_admin: bool
+    email_verified: bool
 
 
 class TokenResponse(BaseModel):
@@ -30,3 +39,8 @@ class TokenResponse(BaseModel):
 class OAuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class SignupPendingVerificationResponse(BaseModel):
+    message: str
+    requires_verification: bool = True

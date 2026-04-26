@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sage/core/configs/theme/app_theme.dart';
+import 'package:sage/presentation/auth/pages/verify_email.dart';
 import 'package:sage/presentation/choose_mode/bloc/theme_cubit.dart';
 import 'package:sage/presentation/splash/pages/splash.dart';
 import 'package:sage/service_locator.dart';
@@ -47,7 +48,11 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: mode,
-          home: const SplashPage(),
+          routes: {
+            '/': (context) => const SplashPage(),
+            '/verify-email': (context) => const VerifyEmailPage(),
+          },
+          initialRoute: Uri.base.path == '/verify-email' ? '/verify-email' : '/',
         ),
       ),
     );

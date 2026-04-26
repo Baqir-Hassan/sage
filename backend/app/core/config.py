@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     secret_key: str = Field(alias="SECRET_KEY")
     access_token_expire_minutes: int = Field(default=1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    verification_token_expire_minutes: int = Field(default=60, alias="VERIFICATION_TOKEN_EXPIRE_MINUTES")
+    verification_resend_cooldown_seconds: int = Field(default=60, alias="VERIFICATION_RESEND_COOLDOWN_SECONDS")
 
     database_url: str = Field(default="sqlite:///./app.db", alias="DATABASE_URL")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
@@ -47,6 +49,12 @@ class Settings(BaseSettings):
 
     default_male_voice: str = Field(default="en-US-AndrewNeural", alias="DEFAULT_MALE_VOICE")
     default_female_voice: str = Field(default="en-US-JennyNeural", alias="DEFAULT_FEMALE_VOICE")
+    smtp_host: str = Field(default="", alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_username: str = Field(default="", alias="SMTP_USERNAME")
+    smtp_password: str = Field(default="", alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field(default="", alias="SMTP_FROM_EMAIL")
+    verify_email_page_url: str = Field(default="https://sageai.live/verify-email", alias="VERIFY_EMAIL_PAGE_URL")
 
     @property
     def frontend_origin_list(self) -> list[str]:

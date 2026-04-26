@@ -6,16 +6,32 @@ import 'package:sage/core/configs/assets/app_vectors.dart';
 import 'package:sage/core/configs/theme/app_color.dart';
 import 'package:sage/data/models/auth/create_user_req.dart';
 import 'package:sage/domain/usecase/auth/signup.dart';
+import 'package:sage/data/sources/auth/auth_api_service.dart';
 import 'package:sage/presentation/auth/pages/singin.dart';
-import 'package:sage/presentation/home/pages/home.dart';
+import 'package:sage/presentation/auth/pages/verify_email.dart';
 import 'package:sage/service_locator.dart';
 
-class SignupPage extends StatelessWidget {
-  SignupPage({super.key});
+class SignupPage extends StatefulWidget {
+  const SignupPage({super.key});
 
+  @override
+  State<SignupPage> createState() => _SignupPageState();
+}
+
+class _SignupPageState extends State<SignupPage> {
   final TextEditingController _fullName = TextEditingController();
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
+  bool _isLoading = false;
+  bool _showVerificationState = false;
+
+  @override
+  void dispose() {
+    _fullName.dispose();
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,38 +65,36 @@ class SignupPage extends StatelessWidget {
               _passwordField(context),
               const SizedBox(height: 30),
               BasicAppButton(
-                onPressed: () async {
-                  var result = await sl<SignupUseCase>().call(
-                    params: CreateUserReq(
-                      email: _email.text.toString(),
-                      fullName: _fullName.text.toString(),
-                      password: _password.text.toString(),
-                    ),
-                  );
-
-                  result.fold(
-                    (l) {
-                      var snackBar = SnackBar(
-                        content: Text(l),
-                        behavior: SnackBarBehavior.floating,
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(snackBar);
-                    },
-                    (r) {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (BuildContext context) => const HomePage(),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                  );
-                },
-                title: "Create Account",
+                onPressed: _isLoading ? null : _createAccount,
+                title: _isLoading ? "Creating..." : "Create Account",
                 textSize: 22,
                 weight: FontWeight.w500,
               ),
+              if (_showVerificationState) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  "Please check your inbox for a verification email. If you don't see it, check your spam/junk folder.",
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _isLoading ? null : _resendVerification,
+                  child: const Text("Resend verification email"),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (BuildContext context) => VerifyEmailPage(
+                          prefilledEmail: _email.text.trim(),
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text("Already have token? Verify now"),
+                ),
+              ],
             ],
           ),
         ),
@@ -181,7 +195,7 @@ class SignupPage extends StatelessWidget {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (BuildContext context) => SigninPage(),
+                  builder: (BuildContext context) => const SigninPage(),
                 ),
               );
             },
@@ -197,5 +211,74 @@ class SignupPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _createAccount() async {
+    setState(() {
+      _isLoading = true;
+    });
+    final result = await sl<SignupUseCase>().call(
+      params: CreateUserReq(
+        email: _email.text.trim(),
+        fullName: _fullName.text.trim(),
+        password: _password.text,
+      ),
+    );
+
+    if (!mounted) return;
+    result.fold(
+      (l) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.toString()),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+      (r) {
+        setState(() {
+          _showVerificationState = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(r.toString()),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+    );
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _resendVerification() async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Enter your email first."),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+    final result = await sl<AuthApiService>().resendVerification(email);
+    if (!mounted) return;
+    result.fold(
+      (l) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.toString()), behavior: SnackBarBehavior.floating),
+      ),
+      (r) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(r.toString()), behavior: SnackBarBehavior.floating),
+      ),
+    );
+    setState(() {
+      _isLoading = false;
+    });
   }
 }

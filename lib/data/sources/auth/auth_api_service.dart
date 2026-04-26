@@ -13,6 +13,8 @@ import 'package:sage/service_locator.dart';
 abstract class AuthApiService {
   Future<Either> signup(CreateUserReq createUserReq);
   Future<Either> signin(SigninUserReq signinUserReq);
+  Future<Either> verifyEmail(String token);
+  Future<Either> resendVerification(String email);
   Future<Either> getUser();
   Future<void> signout();
 }
@@ -47,14 +49,14 @@ class AuthApiServiceImpl extends AuthApiService {
 
     return result.fold(
       (failure) => Left(failure),
-      (body) async {
+      (body) {
         if (body is Map<String, dynamic>) {
-          final token = body['access_token'] as String?;
-          if (token != null && token.isNotEmpty) {
-            await _tokenProvider.setToken(token);
+          final message = body['message'];
+          if (message is String && message.isNotEmpty) {
+            return Right(message);
           }
         }
-        return const Right('Signup was successful');
+        return const Right('Account created. Please verify your email.');
       },
     );
   }
@@ -80,6 +82,54 @@ class AuthApiServiceImpl extends AuthApiService {
           }
         }
         return const Right('Signin was successful');
+      },
+    );
+  }
+
+  @override
+  Future<Either> verifyEmail(String token) async {
+    final result = await _apiClient.postJson(
+      ApiUrls.verifyEmail,
+      authenticated: false,
+      body: {
+        'token': token,
+      },
+    );
+    return result.fold(
+      (failure) => Left(failure),
+      (body) {
+        if (body is Map<String, dynamic>) {
+          final message = body['message'];
+          if (message is String && message.isNotEmpty) {
+            return Right(message);
+          }
+        }
+        return const Right('Email verified successfully.');
+      },
+    );
+  }
+
+  @override
+  Future<Either> resendVerification(String email) async {
+    final result = await _apiClient.postJson(
+      ApiUrls.resendVerification,
+      authenticated: false,
+      body: {
+        'email': email,
+      },
+    );
+    return result.fold(
+      (failure) => Left(failure),
+      (body) {
+        if (body is Map<String, dynamic>) {
+          final message = body['message'];
+          if (message is String && message.isNotEmpty) {
+            return Right(message);
+          }
+        }
+        return const Right(
+          'If an unverified account exists for this email, a verification link was sent.',
+        );
       },
     );
   }

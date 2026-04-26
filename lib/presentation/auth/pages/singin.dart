@@ -5,16 +5,31 @@ import 'package:sage/common/widgets/button/basic_app_button.dart';
 import 'package:sage/core/configs/assets/app_vectors.dart';
 import 'package:sage/core/configs/theme/app_color.dart';
 import 'package:sage/data/models/auth/signin_user_req.dart';
+import 'package:sage/data/sources/auth/auth_api_service.dart';
 import 'package:sage/domain/usecase/auth/signin.dart';
 import 'package:sage/presentation/auth/pages/signup.dart';
 import 'package:sage/presentation/home/pages/home.dart';
 import 'package:sage/service_locator.dart';
 
-class SigninPage extends StatelessWidget {
-  SigninPage({super.key});
+class SigninPage extends StatefulWidget {
+  const SigninPage({super.key});
 
+  @override
+  State<SigninPage> createState() => _SigninPageState();
+}
+
+class _SigninPageState extends State<SigninPage> {
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
+  bool _isLoading = false;
+  bool _showResendVerification = false;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,36 +64,22 @@ class SigninPage extends StatelessWidget {
               const SizedBox(height: 16),
               BasicAppButton(
                 title: 'Sign in',
-                onPressed: () async {
-                  var result = await sl<SigninUseCase>().call(
-                    params: SigninUserReq(
-                      email: _email.text.toString(),
-                      password: _password.text.toString(),
-                    ),
-                  );
-
-                  result.fold(
-                    (l) {
-                      var snackBar = SnackBar(
-                        content: Text(l),
-                        behavior: SnackBarBehavior.floating,
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(snackBar);
-                    },
-                    (r) {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (BuildContext context) => const HomePage(),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                  );
-                },
+                onPressed: _isLoading ? null : _signin,
                 textSize: 22,
                 weight: FontWeight.w500,
               ),
+              if (_showResendVerification) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  "Please verify your email before signing in. If you don't see it, check your spam/junk folder.",
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _isLoading ? null : _resendVerification,
+                  child: const Text("Resend verification email"),
+                ),
+              ],
             ],
           ),
         ),
@@ -187,7 +188,7 @@ class SigninPage extends StatelessWidget {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (BuildContext context) => SignupPage(),
+                  builder: (BuildContext context) => const SignupPage(),
                 ),
               );
             },
@@ -203,5 +204,72 @@ class SigninPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _signin() async {
+    setState(() {
+      _isLoading = true;
+      _showResendVerification = false;
+    });
+    final result = await sl<SigninUseCase>().call(
+      params: SigninUserReq(
+        email: _email.text.trim(),
+        password: _password.text,
+      ),
+    );
+    if (!mounted) return;
+
+    result.fold(
+      (l) {
+        final error = l.toString();
+        setState(() {
+          _showResendVerification = error.toLowerCase().contains("verify your email");
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), behavior: SnackBarBehavior.floating),
+        );
+      },
+      (_) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (BuildContext context) => const HomePage(),
+          ),
+          (route) => false,
+        );
+      },
+    );
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _resendVerification() async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Enter your email first."),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+    });
+    final result = await sl<AuthApiService>().resendVerification(email);
+    if (!mounted) return;
+    result.fold(
+      (l) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.toString()), behavior: SnackBarBehavior.floating),
+      ),
+      (r) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(r.toString()), behavior: SnackBarBehavior.floating),
+      ),
+    );
+    setState(() {
+      _isLoading = false;
+    });
   }
 }

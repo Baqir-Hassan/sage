@@ -18,6 +18,7 @@ class _UserLimitsAdminPageState extends State<UserLimitsAdminPage> {
   bool _loading = false;
   String? _statusMessage;
   Map<String, dynamic>? _currentLimits;
+  List<Map<String, dynamic>> _searchResults = [];
 
   @override
   void dispose() {
@@ -54,6 +55,39 @@ class _UserLimitsAdminPageState extends State<UserLimitsAdminPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _loading ? null : _searchByEmailPrefix,
+                    child: const Text('Search by Email Prefix'),
+                  ),
+                ),
+              ],
+            ),
+            if (_searchResults.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 160,
+                child: ListView.builder(
+                  itemCount: _searchResults.length,
+                  itemBuilder: (context, index) {
+                    final item = _searchResults[index];
+                    final email = item['email']?.toString() ?? '';
+                    return ListTile(
+                      dense: true,
+                      title: Text(email),
+                      subtitle: Text(item['id']?.toString() ?? ''),
+                      onTap: () {
+                        _emailController.text = email;
+                        _loadCurrentLimits();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             TextField(
               controller: _newLectureLimitController,
@@ -121,9 +155,39 @@ class _UserLimitsAdminPageState extends State<UserLimitsAdminPage> {
           return;
         }
         _currentLimits = data;
+        _searchResults = [];
         _newLectureLimitController.text = _nullableIntToText(data['override_daily_new_lecture_limit']);
         _regenerationLimitController.text = _nullableIntToText(data['override_daily_regeneration_limit']);
         _setStatus('Loaded limits for user.');
+      },
+    );
+    if (mounted) {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _searchByEmailPrefix() async {
+    final emailPrefix = _emailController.text.trim();
+    if (emailPrefix.length < 2) {
+      _setStatus('Enter at least 2 characters to search.');
+      return;
+    }
+
+    setState(() => _loading = true);
+    final response = await _adminApiService.searchUsersByEmailPrefix(emailPrefix);
+    response.fold(
+      (error) => _setStatus(error),
+      (data) {
+        if (data is! List) {
+          _setStatus('Unexpected response from server.');
+          return;
+        }
+        _searchResults = data.whereType<Map<String, dynamic>>().toList();
+        if (_searchResults.isEmpty) {
+          _setStatus('No users found for this prefix.');
+        } else {
+          _setStatus('Found ${_searchResults.length} user(s). Tap one to load limits.');
+        }
       },
     );
     if (mounted) {

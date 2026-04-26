@@ -7,6 +7,7 @@ import 'package:sage/service_locator.dart';
 abstract class AdminApiService {
   Future<Either<String, dynamic>> getUserLimits(String userId);
   Future<Either<String, dynamic>> getUserLimitsByEmail(String email);
+  Future<Either<String, dynamic>> searchUsersByEmailPrefix(String emailPrefix);
   Future<Either<String, dynamic>> updateUserLimits({
     required String userId,
     int? dailyNewLectureLimit,
@@ -34,6 +35,14 @@ class AdminApiServiceImpl extends AdminApiService {
     }
 
     return _apiClient.getJson(ApiUrls.adminUserLimitsByEmail(email));
+  }
+
+  @override
+  Future<Either<String, dynamic>> searchUsersByEmailPrefix(String emailPrefix) async {
+    if (_tokenProvider.getToken() == null) {
+      return const Left('Please sign in first.');
+    }
+    return _apiClient.getJson(ApiUrls.adminUserSearchByEmailPrefix(emailPrefix));
   }
 
   @override

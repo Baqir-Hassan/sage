@@ -25,4 +25,6 @@ class ApiUrls {
   static String adminUserLimits(String userId) => '$admin/users/$userId/limits';
   static String adminUserLimitsByEmail(String email) =>
       '$admin/users/limits/by-email?email=${Uri.encodeComponent(email)}';
+  static String adminUserSearchByEmailPrefix(String emailPrefix) =>
+      '$admin/users/search?email_prefix=${Uri.encodeComponent(emailPrefix)}';
 }

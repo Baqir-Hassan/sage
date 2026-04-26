@@ -110,21 +110,23 @@ class ProfilePage extends StatelessWidget {
                         child: const Text('Log out'),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const UserLimitsAdminPage(),
-                            ),
-                          );
-                        },
-                        child: const Text('Admin: User Limits'),
+                    if (user.isAdmin) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const UserLimitsAdminPage(),
+                              ),
+                            );
+                          },
+                          child: const Text('Admin: User Limits'),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               );

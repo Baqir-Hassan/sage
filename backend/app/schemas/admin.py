@@ -12,3 +12,8 @@ class UserLimitResponse(BaseModel):
 class UserLimitUpdateRequest(BaseModel):
     daily_new_lecture_limit: int | None = Field(default=None, ge=0)
     daily_regeneration_limit: int | None = Field(default=None, ge=0)
+
+
+class AdminUserSearchItem(BaseModel):
+    id: str
+    email: str

@@ -242,40 +242,58 @@ def _resolve_subject_selection(db: Session, subject_id: str | None, subject_name
         base_slug = _slugify_subject_name(normalized_subject_name)
         candidate_slug = base_slug
         suffix = 2
+        max_attempts = 100
 
-        while True:
+        for attempt in range(max_attempts):
+            # Check only for current user (one query)
             existing = db.scalar(
                 select(Subject)
                 .where(Subject.slug == candidate_slug)
                 .where(Subject.user_id == current_user.id)
             )
-            if existing is None:
-                subject = Subject(
-                    name=normalized_subject_name,
-                    slug=candidate_slug,
-                    user_id=current_user.id,
-                )
-                db.add(subject)
-                try:
-                    db.flush()
-                    return subject.id
-                except IntegrityError:
-                    # Slug already exists (possibly for another user or race condition)
-                    db.rollback()
-                    candidate_slug = f"{base_slug}-{suffix}"
-                    suffix += 1
-                    continue
-            if existing.name.lower() == normalized_subject_name.lower():
-                return existing.id
-            candidate_slug = f"{base_slug}-{suffix}"
-            suffix += 1
+            
+            if existing is not None:
+                # Found existing subject for this user
+                if existing.name.lower() == normalized_subject_name.lower():
+                    return existing.id
+                # Same slug, different name - try next suffix
+                candidate_slug = f"{base_slug}-{suffix}"
+                suffix += 1
+                continue
+
+            # Try to create new subject
+            subject = Subject(
+                name=normalized_subject_name,
+                slug=candidate_slug,
+                user_id=current_user.id,
+            )
+            db.add(subject)
+            try:
+                db.flush()
+                return subject.id
+            except IntegrityError:
+                # Constraint failed (global slug conflict or race condition)
+                db.rollback()
+                candidate_slug = f"{base_slug}-{suffix}"
+                suffix += 1
+
+        # If we exhausted attempts, create with timestamp suffix as fallback
+        import time
+        fallback_slug = f"{base_slug}-{int(time.time() % 10000)}"
+        subject = Subject(
+            name=normalized_subject_name,
+            slug=fallback_slug,
+            user_id=current_user.id,
+        )
+        db.add(subject)
+        db.flush()
+        return subject.id
 
     if subject_id:
         # Verify that the subject exists and belongs to the current user
         subject = db.get(Subject, subject_id)
         if subject and subject.user_id == current_user.id:
             return subject_id
-        # If subject doesn't exist or doesn't belong to user, return None
         return None
 
     return None

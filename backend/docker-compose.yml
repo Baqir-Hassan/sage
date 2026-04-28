@@ -4,8 +4,19 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     working_dir: /app/backend
     volumes:
-      - ./:/app
+      - ./:/app/backend
     env_file:
       - .env
     ports:
       - "8000:8000"
+
+  worker:
+    build: .
+    command: python -m app.workers.sqs_worker
+    working_dir: /app/backend
+    volumes:
+      - ./:/app/backend
+    env_file:
+      - .env
+    depends_on:
+      - api

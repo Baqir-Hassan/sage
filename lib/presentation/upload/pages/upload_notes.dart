@@ -1,3 +1,4 @@
+import 'package:sage/common/helpers/is_dark_mode.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:sage/common/widgets/appbar/app_bar.dart';
@@ -336,8 +337,8 @@ class _UploadNotesPageState extends State<UploadNotesPage> {
         const SizedBox(height: 14),
         TextField(
           controller: _newSubjectController,
-          style: const TextStyle(
-            color: AppColors.white,
+          style: TextStyle(
+            color: context.isDarkMode ? AppColors.white : AppColors.dark,
           ),
           decoration: const InputDecoration(
             hintText: 'Type a new subject name if needed',

@@ -15,6 +15,11 @@ abstract class AuthApiService {
   Future<Either> signin(SigninUserReq signinUserReq);
   Future<Either> verifyEmail(String token);
   Future<Either> resendVerification(String email);
+  Future<Either> forgotPassword(String email);
+  Future<Either> resetPassword({
+    required String token,
+    required String newPassword,
+  });
   Future<Either> getUser();
   Future<void> signout();
 }
@@ -130,6 +135,58 @@ class AuthApiServiceImpl extends AuthApiService {
         return const Right(
           'If an unverified account exists for this email, a verification link was sent.',
         );
+      },
+    );
+  }
+
+  @override
+  Future<Either> forgotPassword(String email) async {
+    final result = await _apiClient.postJson(
+      ApiUrls.forgotPassword,
+      authenticated: false,
+      body: {
+        'email': email,
+      },
+    );
+    return result.fold(
+      (failure) => Left(failure),
+      (body) {
+        if (body is Map<String, dynamic>) {
+          final message = body['message'];
+          if (message is String && message.isNotEmpty) {
+            return Right(message);
+          }
+        }
+        return const Right(
+          'If an account exists for this email, a password reset link was sent.',
+        );
+      },
+    );
+  }
+
+  @override
+  Future<Either> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    final result = await _apiClient.postJson(
+      ApiUrls.resetPassword,
+      authenticated: false,
+      body: {
+        'token': token,
+        'new_password': newPassword,
+      },
+    );
+    return result.fold(
+      (failure) => Left(failure),
+      (body) {
+        if (body is Map<String, dynamic>) {
+          final message = body['message'];
+          if (message is String && message.isNotEmpty) {
+            return Right(message);
+          }
+        }
+        return const Right('Password reset successfully.');
       },
     );
   }

@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
-
+    reset_password_page_url: str = Field(default="https://sageai.live/reset-password", alias="RESET_PASSWORD_PAGE_URL")
     app_name: str = Field(default="Notes to Lecture API", alias="APP_NAME")
     app_env: str = Field(default="development", alias="APP_ENV")
     debug: bool = Field(default=True, alias="DEBUG")

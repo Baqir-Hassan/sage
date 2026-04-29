@@ -7,6 +7,7 @@ import 'package:sage/core/configs/theme/app_color.dart';
 import 'package:sage/data/models/auth/signin_user_req.dart';
 import 'package:sage/data/sources/auth/auth_api_service.dart';
 import 'package:sage/domain/usecase/auth/signin.dart';
+import 'package:sage/presentation/auth/pages/reset_password.dart';
 import 'package:sage/presentation/auth/pages/signup.dart';
 import 'package:sage/presentation/home/pages/home.dart';
 import 'package:sage/service_locator.dart';
@@ -154,7 +155,14 @@ class _SigninPageState extends State<SigninPage> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         TextButton(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (BuildContext context) => const ResetPasswordPage(),
+              ),
+            );
+          },
           child: const Text(
             "Recovery Password",
             style: TextStyle(

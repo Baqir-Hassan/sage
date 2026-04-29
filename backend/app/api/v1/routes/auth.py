@@ -26,6 +26,8 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
     VerifyEmailRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
 from app.services.email_service import EmailDeliveryError, EmailService
 
@@ -62,8 +64,8 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> SignupPendi
             daily_new_lecture_limit=10,
             daily_regeneration_limit=10,
         )
-    db.add(student_override)
-    db.commit()
+        db.add(student_override)
+        db.commit()
     _send_verification_email(user.email, token)
     return SignupPendingVerificationResponse(
         message=(
@@ -171,6 +173,62 @@ def resend_verification(payload: ResendVerificationRequest, db: Session = Depend
     _send_verification_email(user.email, token)
     return {"message": generic_message}
 
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> dict[str, str]:
+    generic_message = (
+        "If an account exists for this email, you will receive a password reset link. "
+        "If you do not see it, check your spam/junk folder."
+    )
+    user = db.scalar(select(User).where(User.email == payload.email))
+    if not user or not user.email_verified:
+        return {"message": generic_message}
+
+    now = datetime.utcnow()
+    settings = get_settings()
+    if user.verification_sent_at:
+        next_allowed = user.verification_sent_at + timedelta(seconds=settings.verification_resend_cooldown_seconds)
+        if next_allowed > now:
+            retry_seconds = int((next_allowed - now).total_seconds())
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Please wait {retry_seconds}s before requesting another reset email.",
+            )
+
+    token, token_hash, token_expiry = _build_verification_token()
+    user.verification_token_hash = token_hash
+    user.verification_token_expires_at = token_expiry
+    user.verification_sent_at = now
+    db.add(user)
+    db.commit()
+
+    _send_password_reset_email(user.email, token)
+    return {"message": generic_message}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict[str, str]:
+    token_hash = _hash_verification_token(payload.token)
+    user = db.scalar(select(User).where(User.verification_token_hash == token_hash))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token.",
+        )
+
+    now = datetime.utcnow()
+    if not user.verification_token_expires_at or user.verification_token_expires_at < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token.",
+        )
+
+    user.hashed_password = get_password_hash(payload.new_password)
+    user.verification_token_hash = None
+    user.verification_token_expires_at = None
+    user.verification_sent_at = None
+    db.add(user)
+    db.commit()
+    return {"message": "Password reset successfully. You can now sign in."}
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)) -> UserResponse:
@@ -198,4 +256,16 @@ def _send_verification_email(email: str, token: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to send verification email at the moment. Please try again later.",
+        ) from exc
+
+
+def _send_password_reset_email(email: str, token: str) -> None:
+    settings = get_settings()
+    reset_url = f"{settings.reset_password_page_url}?token={quote_plus(token)}"
+    try:
+        EmailService().send_password_reset_email(to_email=email, reset_url=reset_url)
+    except EmailDeliveryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to send password reset email at the moment. Please try again later.",
         ) from exc

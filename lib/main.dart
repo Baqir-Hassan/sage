@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sage/core/configs/theme/app_theme.dart';
+import 'package:sage/presentation/auth/pages/reset_password.dart';
 import 'package:sage/presentation/auth/pages/verify_email.dart';
 import 'package:sage/presentation/choose_mode/bloc/theme_cubit.dart';
 import 'package:sage/presentation/splash/pages/splash.dart';
@@ -51,8 +52,13 @@ class MyApp extends StatelessWidget {
           routes: {
             '/': (context) => const SplashPage(),
             '/verify-email': (context) => const VerifyEmailPage(),
+            '/reset-password': (context) => const ResetPasswordPage(),
           },
-          initialRoute: Uri.base.path == '/verify-email' ? '/verify-email' : '/',
+          initialRoute: Uri.base.path == '/verify-email'
+              ? '/verify-email'
+              : Uri.base.path == '/reset-password'
+              ? '/reset-password'
+              : '/',
         ),
       ),
     );

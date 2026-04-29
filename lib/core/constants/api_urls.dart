@@ -8,6 +8,8 @@ class ApiUrls {
   static const String me = '$apiV1/auth/me';
   static const String verifyEmail = '$apiV1/auth/verify-email';
   static const String resendVerification = '$apiV1/auth/resend-verification';
+  static const String forgotPassword = '$apiV1/auth/forgot-password';
+  static const String resetPassword = '$apiV1/auth/reset-password';
   static const String libraryHome = '$apiV1/library/home';
   static const String lectures = '$apiV1/lectures';
   static const String subjects = '$apiV1/subjects';

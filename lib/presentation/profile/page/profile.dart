@@ -14,6 +14,7 @@ import 'package:sage/presentation/profile/bloc/profile_info_cubit.dart';
 import 'package:sage/presentation/profile/bloc/profile_info_state.dart';
 import 'package:sage/presentation/profile/bloc/saved_lectures_cubit.dart';
 import 'package:sage/presentation/profile/bloc/saved_lectures_state.dart';
+import 'package:sage/presentation/profile/page/privacy_policy.dart';
 import 'package:sage/service_locator.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -108,6 +109,21 @@ class ProfilePage extends StatelessWidget {
                           );
                         },
                         child: const Text('Log out'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PrivacyPolicyPage(),
+                            ),
+                          );
+                        },
+                        child: const Text('Privacy Policy'),
                       ),
                     ),
                     if (user.isAdmin) ...[

@@ -9,6 +9,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.student import is_student_email
+from app.models.user_usage_override import UserUsageOverride
+
 from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.core.security import create_access_token, get_password_hash, verify_password
@@ -51,6 +54,15 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> SignupPendi
         verification_sent_at=datetime.utcnow(),
     )
     db.add(user)
+    db.commit()
+    if is_student_email(payload.email):
+        student_override = UserUsageOverride(
+            id=str(uuid4()),
+            user_id=user.id,
+            daily_new_lecture_limit=10,
+            daily_regeneration_limit=10,
+        )
+    db.add(student_override)
     db.commit()
     _send_verification_email(user.email, token)
     return SignupPendingVerificationResponse(

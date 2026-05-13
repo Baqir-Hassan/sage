@@ -26,14 +26,17 @@ class GroqService:
         payload = {
             "model": self.model,
             "temperature": 0.2,
-            "max_tokens": 2000,
+            "max_tokens": 4000,
             "messages": [
                 {
                     "role": "system",
                     "content": (
                         "You turn class notes into natural spoken lecture scripts that sound like a real teacher "
-                        "guiding a class. Open each lecture in a teacher-like way, such as introducing what "
-                        "today's lesson covers, and keep the explanation warm, clear, and instructional. Also speicfy important definitions, formulas, and examples. Always return the lecture script in a JSON format with the following structure: "
+                        "guiding a class. Break the content into MULTIPLE detailed sections (at least 3-5 sections). "
+                        "For each section, create a comprehensive script that explains the topic thoroughly. "
+                        "Open each lecture in a teacher-like way, such as introducing what today's lesson covers, "
+                        "and keep the explanation warm, clear, and instructional. Include important definitions, formulas, and examples. "
+                        "Cover ALL the material from the notes, not just a brief overview. "
                         "You must return valid JSON only."
                     ),
                 },

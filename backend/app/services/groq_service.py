@@ -26,6 +26,7 @@ class GroqService:
         payload = {
             "model": self.model,
             "temperature": 0.2,
+            "max_tokens": 2000,
             "messages": [
                 {
                     "role": "system",

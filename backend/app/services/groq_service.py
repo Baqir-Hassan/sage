@@ -1,8 +1,11 @@
 import json
+import logging
 
 import requests
 
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class GroqService:
@@ -44,6 +47,7 @@ class GroqService:
             response = requests.post(self.url, headers=headers, json=payload, timeout=90)
             response.raise_for_status()
             data = response.json()
+            logger.info(f"Groq raw response: {json.dumps(data, indent=2)}")
             content = data["choices"][0]["message"]["content"]
             return self._parse_response_text(content)
         except requests.HTTPError as exc:

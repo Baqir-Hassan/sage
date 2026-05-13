@@ -124,9 +124,11 @@ class _UploadNotesPageState extends State<UploadNotesPage> {
               onPressed: _canSubmitUpload ? _uploadNotes : null,
               title: _isUploading
                   ? 'Uploading...'
-                  : _hasUploadQuota
-                      ? 'Generate Lecture'
-                      : 'Daily Limit Reached',
+                  : !_hasUploadQuota
+                      ? 'Daily Limit Reached'
+                      : !_isSubjectSelected
+                          ? 'Select a Subject'
+                          : 'Generate Lecture',
               textSize: 20,
               weight: FontWeight.w600,
             ),
@@ -156,7 +158,9 @@ class _UploadNotesPageState extends State<UploadNotesPage> {
     return remaining > 0;
   }
 
-  bool get _canSubmitUpload => !_isUploading && _hasUploadQuota;
+  bool get _isSubjectSelected => _selectedSubjectId != null || _newSubjectController.text.trim().isNotEmpty;
+
+  bool get _canSubmitUpload => !_isUploading && _hasUploadQuota && _isSubjectSelected;
 
   Widget _usageLimitCard() {
     if (_isLoadingLimits) {

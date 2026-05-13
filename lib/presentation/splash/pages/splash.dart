@@ -4,6 +4,7 @@ import 'package:sage/domain/usecase/auth/get_user.dart';
 import 'package:sage/presentation/home/pages/home.dart';
 import 'package:sage/presentation/intro/pages/get_started.dart';
 import 'package:sage/service_locator.dart';
+import 'package:flutter/foundation.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -33,17 +34,27 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> redirect() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      final userResult = await sl<GetUserUseCase>().call();
-      final isAuthenticated = userResult.isRight();
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (BuildContext context) =>
-              isAuthenticated ? const HomePage() : const GetStartedPage(),
-        ),
-      );
+  await Future.delayed(const Duration(seconds: 2));
+  if (!mounted) return;
+
+  // Don't redirect if we're on a special web route
+  if (kIsWeb) {
+    final path = Uri.base.path;
+    if (path == '/reset-password' ||
+        path == '/verify-email' ||
+        path == '/privacy-policy') {
+      return;
     }
   }
+
+  final userResult = await sl<GetUserUseCase>().call();
+  final isAuthenticated = userResult.isRight();
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (BuildContext context) =>
+          isAuthenticated ? const HomePage() : const GetStartedPage(),
+    ),
+  );
+}
 }

@@ -199,8 +199,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   padding: const EdgeInsets.only(right: 15),
                   child: Image.asset(
                     AppImages.homeArtwork,
-                    height: 250,
-                    width: 250,
+                    height: 200,
+                    width: 200,
                   ),
                 ),
               ),

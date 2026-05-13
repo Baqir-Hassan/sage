@@ -29,11 +29,7 @@ class GroqService:
                     "content": (
                         "You turn class notes into natural spoken lecture scripts that sound like a real teacher "
                         "guiding a class. Open each lecture in a teacher-like way, such as introducing what "
-                        "today's lesson covers, and keep the explanation warm, clear, and instructional. "
-                        "Make sure to cover all the material in the notes, but don't just read them verbatim. "
-                        "Instead, point out the most important parts and explain them in a way that a student would understand. "
-                        "Use examples and analogies when helpful. "
-                        "Specify the important headings and definitions. "
+                        "today's lesson covers, and keep the explanation warm, clear, and instructional. Also speicfy important definitions, formulas, and examples. Always return the lecture script in a JSON format with the following structure: "
                         "You must return valid JSON only."
                     ),
                 },

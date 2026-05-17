@@ -2,10 +2,10 @@ from math import ceil
 from pathlib import Path
 import re
 from uuid import uuid4
-
+ 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
+ 
 from app.models.audio_track import AudioTrack
 from app.models.document import Document
 from app.models.lecture import Lecture
@@ -19,8 +19,8 @@ from app.services.groq_service import GroqService
 from app.services.parser_service import ParserService
 from app.services.storage_service import get_storage_service
 from app.services.voice_service import resolve_tts_voice
-
-
+ 
+ 
 class ProcessingService:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -28,12 +28,12 @@ class ProcessingService:
         self.llm = GroqService()
         self.storage = get_storage_service()
         self.audio = AudioGenerationService()
-
+ 
     def process_document(self, document_id: str) -> None:
         document = self.db.get(Document, document_id)
         if not document:
             return
-
+ 
         job = self.db.scalar(
             select(ProcessingJob)
             .where(ProcessingJob.document_id == document_id)
@@ -41,55 +41,64 @@ class ProcessingService:
         )
         if not job:
             return
-
+ 
         try:
             job.status = "processing"
             document.status = "processing"
             self.db.commit()
-
+ 
             extracted_text = self._extract_text_for_document(document)
-            lecture_payload = self.llm.generate_lecture_script(
+            lecture_payloads = self.llm.generate_lecture_script(
                 prompt=self._build_prompt(document.original_filename, extracted_text)
             )
-
-            subject = self._resolve_subject(document, lecture_payload)
-            playlist = self._resolve_playlist(document, subject, lecture_payload)
-            lecture = self._create_lecture(document, playlist, lecture_payload)
-            self._create_sections(lecture, lecture_payload, extracted_text)
-            self.db.flush()
-            self._create_audio_tracks(lecture)
-
-            if not self.db.scalar(
-                select(PlaylistLecture).where(
-                    PlaylistLecture.playlist_id == playlist.id,
-                    PlaylistLecture.lecture_id == lecture.id,
-                )
-            ):
-                self.db.add(
-                    PlaylistLecture(
-                        playlist_id=playlist.id,
-                        lecture_id=lecture.id,
-                        position=0,
+ 
+            if isinstance(lecture_payloads, dict):
+                lecture_payloads = [lecture_payloads]
+ 
+            subject = self._resolve_subject(document, lecture_payloads[0])
+            playlist = self._resolve_playlist(document, subject, lecture_payloads[0])
+ 
+            last_lecture = None
+            for i, lecture_payload in enumerate(lecture_payloads):
+                lecture = self._create_lecture(document, playlist, lecture_payload, part_index=i)
+                self._create_sections(lecture, lecture_payload, extracted_text)
+                self.db.flush()
+                self._create_audio_tracks(lecture)
+                last_lecture = lecture
+ 
+                if not self.db.scalar(
+                    select(PlaylistLecture).where(
+                        PlaylistLecture.playlist_id == playlist.id,
+                        PlaylistLecture.lecture_id == lecture.id,
                     )
-                )
-
+                ):
+                    self.db.add(
+                        PlaylistLecture(
+                            playlist_id=playlist.id,
+                            lecture_id=lecture.id,
+                            position=i,
+                        )
+                    )
+ 
             document.subject_id = subject.id
             document.status = "ready"
-            lecture.status = "ready"
+            if last_lecture:
+                last_lecture.status = "ready"
             job.status = "completed"
             self.db.commit()
+ 
         except Exception as exc:
             job.status = "failed"
             job.error_message = str(exc)
             document.status = "failed"
             self.db.commit()
             raise
-
+ 
     def generate_audio_for_lecture(self, lecture_id: str) -> Lecture | None:
         lecture = self.db.get(Lecture, lecture_id)
         if not lecture:
             return None
-
+ 
         lecture.status = "audio_processing"
         self.db.commit()
         self._create_audio_tracks(lecture)
@@ -97,32 +106,38 @@ class ProcessingService:
         self.db.commit()
         self.db.refresh(lecture)
         return lecture
-
+ 
     def regenerate_lecture_content(self, lecture_id: str) -> Lecture | None:
         lecture = self.db.get(Lecture, lecture_id)
         if not lecture:
             return None
-
+ 
         document = lecture.document
         if not document:
             return None
-
+ 
         lecture.status = "content_processing"
         self.db.commit()
-
+ 
         extracted_text = self._extract_text_for_document(document)
-        lecture_payload = self.llm.generate_lecture_script(
+        lecture_payloads = self.llm.generate_lecture_script(
             prompt=self._build_prompt(document.original_filename, extracted_text)
         )
-
+ 
+        if isinstance(lecture_payloads, dict):
+            lecture_payloads = [lecture_payloads]
+ 
+        # Use only the first payload to regenerate this lecture's content
+        lecture_payload = lecture_payloads[0]
+ 
         self._clear_existing_audio_and_sections(lecture)
-
+ 
         lecture.title = lecture_payload.get("lecture_title") or lecture.title
         lecture.description = lecture_payload.get("lecture_description") or lecture.description
         lecture.tts_voice_code = resolve_tts_voice(lecture.voice_option)
         lecture.status = "script_ready"
         self.db.flush()
-
+ 
         self._create_sections(lecture, lecture_payload, extracted_text)
         self.db.flush()
         self._create_audio_tracks(lecture)
@@ -130,7 +145,7 @@ class ProcessingService:
         self.db.commit()
         self.db.refresh(lecture)
         return lecture
-
+ 
     def _build_prompt(self, filename: str, extracted_text: str) -> str:
         return (
             "Convert the following class notes into a spoken audio lecture. "
@@ -139,25 +154,25 @@ class ProcessingService:
             "Do not use markdown, bullet points, or any formatting — only natural spoken sentences.\n"
             f"Filename: {filename}\n"
             f"Notes:\n{extracted_text[:12000]}"
-            )
-
+        )
+ 
     def _resolve_subject(self, document: Document, lecture_payload: dict) -> Subject:
         if document.subject_id:
             subject = self.db.get(Subject, document.subject_id)
             if subject:
                 return subject
-
+ 
         subject_name = lecture_payload.get("subject") or "General"
         slug = subject_name.lower().replace(" ", "-")
         subject = self.db.scalar(select(Subject).where(Subject.slug == slug))
         if subject:
             return subject
-
+ 
         subject = Subject(name=subject_name, slug=slug)
         self.db.add(subject)
         self.db.flush()
         return subject
-
+ 
     def _resolve_playlist(self, document: Document, subject: Subject, lecture_payload: dict) -> Playlist:
         playlist_title = lecture_payload.get("playlist_title") or subject.name
         existing = self.db.scalar(
@@ -169,7 +184,7 @@ class ProcessingService:
         )
         if existing:
             return existing
-
+ 
         playlist = Playlist(
             title=playlist_title,
             description=f"System playlist for {subject.name} notes.",
@@ -180,12 +195,13 @@ class ProcessingService:
         self.db.add(playlist)
         self.db.flush()
         return playlist
-
-    def _create_lecture(self, document: Document, playlist: Playlist, lecture_payload: dict) -> Lecture:
-        existing = self.db.scalar(select(Lecture).where(Lecture.document_id == document.id))
-        if existing:
-            return existing
-
+ 
+    def _create_lecture(self, document: Document, playlist: Playlist, lecture_payload: dict, part_index: int = 0) -> Lecture:
+        if part_index == 0:
+            existing = self.db.scalar(select(Lecture).where(Lecture.document_id == document.id))
+            if existing:
+                return existing
+ 
         lecture = Lecture(
             document_id=document.id,
             owner_user_id=document.user_id,
@@ -199,17 +215,17 @@ class ProcessingService:
         self.db.add(lecture)
         self.db.flush()
         return lecture
-
+ 
     def _create_sections(self, lecture: Lecture, lecture_payload: dict, extracted_text: str) -> None:
         existing_sections = self._get_sections_for_lecture(lecture.id)
         if existing_sections:
             return
-
+ 
         sections = lecture_payload.get("sections") or []
         if not sections:
             sections = self._fallback_sections(extracted_text)
         sections = self._normalize_sections(sections)
-
+ 
         for index, section in enumerate(sections, start=1):
             script_text = section.get("script") or section.get("content") or ""
             self.db.add(
@@ -221,7 +237,7 @@ class ProcessingService:
                     estimated_duration_seconds=max(30, ceil(len(script_text.split()) / 2.5)),
                 )
             )
-
+ 
     def _fallback_sections(self, extracted_text: str) -> list[dict[str, str]]:
         paragraphs = [part.strip() for part in extracted_text.split("\n\n") if part.strip()]
         if not paragraphs:
@@ -234,7 +250,7 @@ class ProcessingService:
             }
             for index, paragraph in enumerate(trimmed, start=1)
         ]
-
+ 
     def _normalize_sections(self, sections: list[dict[str, str]]) -> list[dict[str, str]]:
         cleaned_sections: list[dict[str, str]] = []
         for index, section in enumerate(sections, start=1):
@@ -243,18 +259,8 @@ class ProcessingService:
             if not script:
                 continue
             cleaned_sections.append({"title": title, "script": script})
-
-        if not cleaned_sections:
-            return []
-
-        total_duration = sum(self._estimate_duration_seconds(section["script"]) for section in cleaned_sections)
-        if total_duration <= 360:
-            merged_title = cleaned_sections[0]["title"] if len(cleaned_sections) == 1 else "Full Lecture"
-            merged_script = "\n\n".join(section["script"] for section in cleaned_sections)
-            return [{"title": merged_title, "script": merged_script}]
-
         return cleaned_sections
-
+ 
     def _expand_into_spoken_script(self, raw_text: str, index: int) -> str:
         lines = [line.strip(" -\t") for line in raw_text.splitlines() if line.strip()]
         if not lines:
@@ -262,7 +268,7 @@ class ProcessingService:
                 f"Today's lecture section {index} focuses on the uploaded material. The document did not contain enough readable text "
                 "to generate a detailed lecture for this part."
             )
-
+ 
         topic = lines[0].rstrip(":")
         bullet_lines = lines[1:] or lines[:1]
         normalized_points = [self._normalize_point_text(line) for line in bullet_lines[:8]]
@@ -278,7 +284,7 @@ class ProcessingService:
             f"Taken together, these points explain the main idea behind {topic} "
             "and give a foundation for the rest of the lecture."
         ).strip()
-
+ 
     def _normalize_point_text(self, text: str) -> str:
         cleaned = re.sub(r"\s+", " ", text).strip(" ,.;:-")
         if not cleaned:
@@ -290,10 +296,10 @@ class ProcessingService:
         if cleaned.endswith("."):
             cleaned = cleaned[:-1]
         return cleaned
-
+ 
     def _estimate_duration_seconds(self, script_text: str) -> int:
         return max(30, ceil(len(script_text.split()) / 2.5))
-
+ 
     def _create_audio_tracks(self, lecture: Lecture) -> None:
         voice_code = lecture.tts_voice_code or resolve_tts_voice(lecture.voice_option)
         for section in self._get_sections_for_lecture(lecture.id):
@@ -302,7 +308,7 @@ class ProcessingService:
             )
             if existing_track:
                 continue
-
+ 
             output_path = self.storage.build_audio_path(lecture.id, section.id)
             track = AudioTrack(
                 lecture_section_id=section.id,
@@ -312,11 +318,11 @@ class ProcessingService:
             )
             self.db.add(track)
             self.db.flush()
-
+ 
             self.audio.generate_section_audio(section.script_text, voice_code, output_path)
             track.storage_key = self.storage.persist_generated_audio(output_path, lecture.id, section.id)
             track.status = "ready"
-
+ 
     def _clear_existing_audio_and_sections(self, lecture: Lecture) -> None:
         for section in self._get_sections_for_lecture(lecture.id):
             if section.audio_track:
@@ -327,13 +333,14 @@ class ProcessingService:
             self.db.delete(section)
         self.db.flush()
         lecture.sections = []
-
+ 
     def _extract_text_for_document(self, document: Document) -> str:
         return self.parser.extract_text(document.storage_key, document.content_type)
-
+ 
     def _get_sections_for_lecture(self, lecture_id: str) -> list[LectureSection]:
         return self.db.scalars(
             select(LectureSection)
             .where(LectureSection.lecture_id == lecture_id)
             .order_by(LectureSection.order_index.asc())
         ).all()
+ 

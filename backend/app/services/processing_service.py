@@ -58,9 +58,24 @@ class ProcessingService:
             subject = self._resolve_subject(document, lecture_payloads[0])
             playlist = self._resolve_playlist(document, subject, lecture_payloads[0])
  
+            # FIX: wipe any lectures already tied to this document before rebuilding,
+            # so that re-processing a document doesn't hit the old-track / old-section
+            # guards and silently produce empty or truncated audio.
+            existing_lectures = self.db.scalars(
+                select(Lecture).where(Lecture.document_id == document.id)
+            ).all()
+            for lec in existing_lectures:
+                self._clear_existing_audio_and_sections(lec)
+                self.db.delete(lec)
+            self.db.flush()
+ 
             last_lecture = None
             for i, lecture_payload in enumerate(lecture_payloads):
+                # FIX: always create a fresh Lecture per chunk — the old part_index==0
+                # dedup check caused all payloads to reuse the same lecture row.
                 lecture = self._create_lecture(document, playlist, lecture_payload, part_index=i)
+                # FIX: _create_sections no longer has an early-return guard; every
+                # chunk's sections are written unconditionally.
                 self._create_sections(lecture, lecture_payload, extracted_text)
                 self.db.flush()
                 self._create_audio_tracks(lecture)
@@ -197,11 +212,9 @@ class ProcessingService:
         return playlist
  
     def _create_lecture(self, document: Document, playlist: Playlist, lecture_payload: dict, part_index: int = 0) -> Lecture:
-        if part_index == 0:
-            existing = self.db.scalar(select(Lecture).where(Lecture.document_id == document.id))
-            if existing:
-                return existing
- 
+        # FIX: removed the part_index==0 dedup check that caused all chunks to reuse
+        # the same Lecture row, resulting in only the first chunk's sections being
+        # saved and all subsequent chunks silently dropped.
         lecture = Lecture(
             document_id=document.id,
             owner_user_id=document.user_id,
@@ -217,10 +230,12 @@ class ProcessingService:
         return lecture
  
     def _create_sections(self, lecture: Lecture, lecture_payload: dict, extracted_text: str) -> None:
-        existing_sections = self._get_sections_for_lecture(lecture.id)
-        if existing_sections:
-            return
- 
+        # FIX: removed the early-return guard (`if existing_sections: return`).
+        # That guard was correct for idempotency in isolation, but combined with
+        # the _create_lecture dedup bug it meant chunks 2-4 all wrote into the
+        # same lecture that already had sections, so nothing was ever saved for
+        # them. Now that each chunk gets its own fresh Lecture row (no prior
+        # sections), this guard is unnecessary and harmful.
         sections = lecture_payload.get("sections") or []
         if not sections:
             sections = self._fallback_sections(extracted_text)

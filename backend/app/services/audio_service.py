@@ -14,3 +14,8 @@ class AudioGenerationService:
     async def _save_audio(self, text: str, voice: str, output_path: Path) -> None:
         communicate = edge_tts.Communicate(text=text, voice=voice)
         await communicate.save(str(output_path))
+async def _save_audio(self, text: str, voice: str, output_path: Path) -> None:
+    print(f"[AUDIO DEBUG] voice={voice} chars={len(text)} words={len(text.split())} path={output_path}")
+    print(f"[AUDIO DEBUG] text preview: {text[:200]}")
+    communicate = edge_tts.Communicate(text=text, voice=voice)
+    await communicate.save(str(output_path))

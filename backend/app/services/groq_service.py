@@ -27,7 +27,7 @@ class GroqService:
         payload = {
             "model": self.model,
             "temperature": 0.2,
-            "max_tokens": 32000,  # Fix 1: use near-max to avoid cutoff
+            "max_tokens": 6000,  # Fix 1: use near-max to avoid cutoff
             "messages": [
                 {
                     "role": "system",

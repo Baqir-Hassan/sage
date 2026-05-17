@@ -133,21 +133,13 @@ class ProcessingService:
 
     def _build_prompt(self, filename: str, extracted_text: str) -> str:
         return (
-            "You are creating an audio lecture from class notes. "
-            "Return valid JSON only with keys subject, playlist_title, lecture_title, lecture_description, and sections. "
-            "If the full lecture would be shorter than 6 minutes, return exactly 1 section. "
-            "Only split into multiple sections when the full lecture is likely longer than 6 minutes, "
-            "and in that case keep the number of sections modest. "
-            "Each section must contain title and script. "
-            "Each script should sound like a spoken lecture, not bullet points, and should usually be between 120 and 220 words. "
-            "Write in the voice of a real teacher speaking to students. The opening of the first section must begin like "
-            "an actual lesson introduction, for example by saying what today's lecture is about or what students will learn today. "
-            "Avoid robotic phrasing, avoid reading the notes like a list, and keep the tone warm, clear, and instructional. "
-            "Expand abbreviations, connect ideas naturally, and explain the meaning of keywords from the notes. "
-            "Do not use markdown, code fences, or extra text outside the JSON.\n"
+            "Convert the following class notes into a spoken audio lecture. "
+            "Write in the voice of a real teacher speaking to students. "
+            "Expand abbreviations, connect ideas naturally, and explain keywords. "
+            "Do not use markdown, bullet points, or any formatting — only natural spoken sentences.\n"
             f"Filename: {filename}\n"
             f"Notes:\n{extracted_text[:12000]}"
-        )
+            )
 
     def _resolve_subject(self, document: Document, lecture_payload: dict) -> Subject:
         if document.subject_id:

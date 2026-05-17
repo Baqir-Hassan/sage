@@ -28,7 +28,6 @@ class GroqService:
             "model": self.model,
             "temperature": 0.2,
             "max_tokens": 32000,  # Fix 1: use near-max to avoid cutoff
-            "response_format": {"type": "json_object"},  # Fix 4: force JSON output
             "messages": [
                 {
                     "role": "system",
@@ -72,10 +71,13 @@ class GroqService:
             content = data["choices"][0]["message"]["content"]
             return self._parse_response_text(content)
         except requests.HTTPError as exc:
+            logger.error(f"Groq HTTP error: {exc.response.status_code} - {exc.response.text}")
             return self._fallback_payload(f"Groq HTTP error: {exc}")
         except requests.RequestException as exc:
+            logger.error(f"Groq request error: {exc}")
             return self._fallback_payload(f"Groq request error: {exc}")
         except Exception as exc:
+            logger.error(f"Groq unexpected error: {exc}")
             return self._fallback_payload(f"Groq unexpected error: {exc}")
 
     def _parse_response_text(self, response_text: str | None) -> dict:
